@@ -1,0 +1,208 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+
+    // ── SETUP ─────────────────────────────────────────────────────────────────
+
+    {
+      "label": "🔧 Setup: Create Virtual Environment",
+      "type": "shell",
+      "command": "python -m venv .venv",
+      "windows": { "command": "python -m venv .venv" },
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+
+    {
+      "label": "🔧 Setup: Install Dependencies",
+      "type": "shell",
+      "command": ".venv/bin/pip install -r module_1a_data_simulation/requirements.txt",
+      "windows": {
+        "command": ".venv\\Scripts\\pip install -r module_1a_data_simulation\\requirements.txt"
+      },
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+
+    {
+      "label": "🔧 Setup: Full Setup (venv + install)",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "🔧 Setup: Create Virtual Environment",
+        "🔧 Setup: Install Dependencies"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+
+    // ── SIMULATE ──────────────────────────────────────────────────────────────
+
+    {
+      "label": "▶ Simulate: Default (5 min, random)",
+      "type": "shell",
+      "command": ".venv/bin/python main.py --duration 300 --n_events 5 --noise medium --seed 42 --out output/default",
+      "windows": {
+        "command": ".venv\\Scripts\\python main.py --duration 300 --n_events 5 --noise medium --seed 42 --out output/default"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/module_1a_data_simulation",
+        "env": { "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation" }
+      },
+      "group": { "kind": "test", "isDefault": true },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+
+    {
+      "label": "▶ Simulate: Anger (high noise)",
+      "type": "shell",
+      "command": ".venv/bin/python main.py --duration 240 --n_events 4 --event_dur 25 --emotion Anger --noise high --seed 42 --out output/anger",
+      "windows": {
+        "command": ".venv\\Scripts\\python main.py --duration 240 --n_events 4 --event_dur 25 --emotion Anger --noise high --seed 42 --out output/anger"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/module_1a_data_simulation",
+        "env": { "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation" }
+      },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+      "problemMatcher": []
+    },
+
+    {
+      "label": "▶ Simulate: High Arousal (Fear, Anger, Surprise)",
+      "type": "shell",
+      "command": ".venv/bin/python main.py --duration 360 --n_events 6 --emotions Fear,Anger,Surprise --noise medium --seed 7 --out output/high_arousal",
+      "windows": {
+        "command": ".venv\\Scripts\\python main.py --duration 360 --n_events 6 --emotions Fear,Anger,Surprise --noise medium --seed 7 --out output/high_arousal"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/module_1a_data_simulation",
+        "env": { "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation" }
+      },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+      "problemMatcher": []
+    },
+
+    {
+      "label": "▶ Simulate: Physiological Needs",
+      "type": "shell",
+      "command": ".venv/bin/python main.py --duration 480 --n_events 5 --event_dur random --emotions Hunger,Thirst,Toilet,Tired --noise medium --seed 99 --out output/needs",
+      "windows": {
+        "command": ".venv\\Scripts\\python main.py --duration 480 --n_events 5 --event_dur random --emotions Hunger,Thirst,Toilet,Tired --noise medium --seed 99 --out output/needs"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/module_1a_data_simulation",
+        "env": { "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation" }
+      },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+      "problemMatcher": []
+    },
+
+    {
+      "label": "▶ Simulate: Fully Random",
+      "type": "shell",
+      "command": ".venv/bin/python main.py --n_events random --event_dur random --noise low --seed 0 --out output/random",
+      "windows": {
+        "command": ".venv\\Scripts\\python main.py --n_events random --event_dur random --noise low --seed 0 --out output/random"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/module_1a_data_simulation",
+        "env": { "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation" }
+      },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+      "problemMatcher": []
+    },
+
+    {
+      "label": "▶ Simulate: CSV Only (no plots)",
+      "type": "shell",
+      "command": ".venv/bin/python main.py --duration 600 --n_events 8 --no_plots --out output/csv_only",
+      "windows": {
+        "command": ".venv\\Scripts\\python main.py --duration 600 --n_events 8 --no_plots --out output/csv_only"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/module_1a_data_simulation",
+        "env": { "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation" }
+      },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+      "problemMatcher": []
+    },
+
+    {
+      "label": "📋 List All Emotion Labels",
+      "type": "shell",
+      "command": ".venv/bin/python main.py --list_emotions",
+      "windows": { "command": ".venv\\Scripts\\python main.py --list_emotions" },
+      "options": {
+        "cwd": "${workspaceFolder}/module_1a_data_simulation",
+        "env": { "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation" }
+      },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared", "clear": false },
+      "problemMatcher": []
+    },
+
+    // ── TESTS ─────────────────────────────────────────────────────────────────
+
+    {
+      "label": "🧪 Run Tests",
+      "type": "shell",
+      "command": ".venv/bin/python -m pytest tests/ -v --tb=short",
+      "windows": { "command": ".venv\\Scripts\\python -m pytest tests/ -v --tb=short" },
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": { "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation" }
+      },
+      "group": { "kind": "test", "isDefault": false },
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+      "problemMatcher": []
+    },
+
+    // ── UTILITIES ─────────────────────────────────────────────────────────────
+
+    {
+      "label": "🗑️ Clean: Delete output folders",
+      "type": "shell",
+      "command": "rm -rf module_1a_data_simulation/output*/",
+      "windows": { "command": "if exist module_1a_data_simulation\\output rd /s /q module_1a_data_simulation\\output" },
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "presentation": { "reveal": "silent", "panel": "shared" },
+      "problemMatcher": []
+    },
+
+    {
+      "label": "📦 Freeze: Export requirements",
+      "type": "shell",
+      "command": ".venv/bin/pip freeze > module_1a_data_simulation/requirements.lock",
+      "windows": { "command": ".venv\\Scripts\\pip freeze > module_1a_data_simulation\\requirements.lock" },
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "presentation": { "reveal": "silent", "panel": "shared" },
+      "problemMatcher": []
+    }
+
+  ]
+}

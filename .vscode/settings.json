@@ -1,0 +1,79 @@
+{
+  // ── Python ────────────────────────────────────────────────────────────────
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "[windows]": {
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe"
+  },
+  "python.terminal.activateEnvironment": true,
+  "python.terminal.activateEnvInCurrentTerminal": true,
+
+  // ── Linting ───────────────────────────────────────────────────────────────
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": false,
+  "python.linting.flake8Enabled": true,
+  "python.linting.flake8Args": [
+    "--max-line-length=100",
+    "--ignore=E203,W503,E501"
+  ],
+
+  // ── Formatting ────────────────────────────────────────────────────────────
+  "editor.formatOnSave": true,
+  "python.formatting.provider": "black",
+  "python.formatting.blackArgs": ["--line-length", "100"],
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+
+  // ── Editor ────────────────────────────────────────────────────────────────
+  "editor.rulers": [100],
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "editor.renderWhitespace": "boundary",
+  "editor.suggestSelection": "first",
+  "editor.inlineSuggest.enabled": true,
+
+  // ── Files ─────────────────────────────────────────────────────────────────
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.pytest_cache": true,
+    "**/*.egg-info": true
+  },
+  "files.associations": {
+    "*.md": "markdown"
+  },
+
+  // ── Explorer ──────────────────────────────────────────────────────────────
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "*.py": "${capture}.pyc",
+    "requirements.txt": "requirements*.txt"
+  },
+
+  // ── Terminal ──────────────────────────────────────────────────────────────
+  "terminal.integrated.env.linux": {
+    "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation"
+  },
+  "terminal.integrated.env.osx": {
+    "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation"
+  },
+  "terminal.integrated.env.windows": {
+    "PYTHONPATH": "${workspaceFolder}\\module_1a_data_simulation"
+  },
+
+  // ── Test discovery ────────────────────────────────────────────────────────
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["tests"],
+  "python.testing.unittestEnabled": false,
+
+  // ── Markdown ──────────────────────────────────────────────────────────────
+  "markdown.preview.breaks": true,
+
+  // ── Workspace ─────────────────────────────────────────────────────────────
+  "workbench.colorTheme": "Default Dark Modern",
+  "workbench.startupEditor": "readme"
+}

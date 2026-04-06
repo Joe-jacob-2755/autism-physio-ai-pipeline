@@ -1,0 +1,186 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+
+    // ── 1. Default run (5 min, 5 random events, medium noise) ────────────────
+    {
+      "name": "▶ Run: Default Simulation",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/module_1a_data_simulation/main.py",
+      "cwd": "${workspaceFolder}/module_1a_data_simulation",
+      "args": [
+        "--duration", "300",
+        "--n_events", "5",
+        "--event_dur", "30",
+        "--noise", "medium",
+        "--seed", "42",
+        "--out", "output/default"
+      ],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+
+    // ── 2. Single emotion — Anger ────────────────────────────────────────────
+    {
+      "name": "▶ Run: Anger (single emotion)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/module_1a_data_simulation/main.py",
+      "cwd": "${workspaceFolder}/module_1a_data_simulation",
+      "args": [
+        "--duration", "240",
+        "--n_events", "4",
+        "--event_dur", "25",
+        "--emotion", "Anger",
+        "--noise", "high",
+        "--seed", "42",
+        "--out", "output/anger"
+      ],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+
+    // ── 3. Multiple emotions — high arousal set ──────────────────────────────
+    {
+      "name": "▶ Run: High Arousal (Fear, Anger, Surprise)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/module_1a_data_simulation/main.py",
+      "cwd": "${workspaceFolder}/module_1a_data_simulation",
+      "args": [
+        "--duration", "360",
+        "--n_events", "6",
+        "--event_dur", "30",
+        "--emotions", "Fear,Anger,Surprise",
+        "--noise", "medium",
+        "--seed", "7",
+        "--out", "output/high_arousal"
+      ],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+
+    // ── 4. Physiological needs ───────────────────────────────────────────────
+    {
+      "name": "▶ Run: Physiological Needs",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/module_1a_data_simulation/main.py",
+      "cwd": "${workspaceFolder}/module_1a_data_simulation",
+      "args": [
+        "--duration", "480",
+        "--n_events", "5",
+        "--event_dur", "random",
+        "--emotions", "Hunger,Thirst,Toilet,Tired",
+        "--noise", "medium",
+        "--seed", "99",
+        "--out", "output/needs"
+      ],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+
+    // ── 5. Fully random ──────────────────────────────────────────────────────
+    {
+      "name": "▶ Run: Fully Random",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/module_1a_data_simulation/main.py",
+      "cwd": "${workspaceFolder}/module_1a_data_simulation",
+      "args": [
+        "--duration", "300",
+        "--n_events", "random",
+        "--event_dur", "random",
+        "--noise", "low",
+        "--seed", "0",
+        "--out", "output/random"
+      ],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+
+    // ── 6. CSV only (no plots, fast) ─────────────────────────────────────────
+    {
+      "name": "▶ Run: CSV Only (no plots)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/module_1a_data_simulation/main.py",
+      "cwd": "${workspaceFolder}/module_1a_data_simulation",
+      "args": [
+        "--duration", "600",
+        "--n_events", "8",
+        "--event_dur", "30",
+        "--noise", "medium",
+        "--seed", "42",
+        "--no_plots",
+        "--out", "output/csv_only"
+      ],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+
+    // ── 7. List emotions ─────────────────────────────────────────────────────
+    {
+      "name": "▶ List All Emotion Labels",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/module_1a_data_simulation/main.py",
+      "cwd": "${workspaceFolder}/module_1a_data_simulation",
+      "args": ["--list_emotions"],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+
+    // ── 8. Debug current file ────────────────────────────────────────────────
+    {
+      "name": "🐛 Debug: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}/module_1a_data_simulation",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+
+    // ── 9. Run tests ─────────────────────────────────────────────────────────
+    {
+      "name": "🧪 Run Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests/", "-v", "--tb=short"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+
+  ]
+}

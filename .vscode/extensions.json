@@ -1,0 +1,34 @@
+{
+  "recommendations": [
+    // ── Python core ──────────────────────────────────────────────────────────
+    "ms-python.python",           // Python language support
+    "ms-python.debugpy",          // Python debugger
+    "ms-python.black-formatter",  // Black code formatter
+    "ms-python.flake8",           // Flake8 linter
+    "ms-python.isort",            // Import sorting
+
+    // ── Notebooks & data ─────────────────────────────────────────────────────
+    "ms-toolsai.jupyter",         // Jupyter notebooks
+    "ms-toolsai.jupyter-keymap",
+    "GrapeCity.gc-excelviewer",   // CSV file preview in VS Code
+
+    // ── Documentation ────────────────────────────────────────────────────────
+    "yzhang.markdown-all-in-one", // Markdown editing + preview
+    "bierner.markdown-preview-github-styles", // GitHub-style Markdown preview
+    "DavidAnson.vscode-markdownlint",         // Markdown linting
+
+    // ── Git ──────────────────────────────────────────────────────────────────
+    "eamodio.gitlens",            // Git history, blame, diff
+    "mhutchie.git-graph",         // Visual git graph
+
+    // ── Productivity ─────────────────────────────────────────────────────────
+    "streetsidesoftware.code-spell-checker", // Spell check in comments/docs
+    "christian-kohler.path-intellisense",    // Filename autocomplete
+    "ms-vscode.vscode-json",                 // JSON support
+    "alefragnani.Bookmarks",                 // Code bookmarks
+
+    // ── Visual ───────────────────────────────────────────────────────────────
+    "PKief.material-icon-theme",  // File icons
+    "oderwat.indent-rainbow"      // Indentation highlighting
+  ]
+}
