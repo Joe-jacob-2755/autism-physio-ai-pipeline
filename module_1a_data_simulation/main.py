@@ -2,28 +2,44 @@
 =============================================================================
 MODULE 1A – DATA SIMULATION  |  main.py
 =============================================================================
-Entry point and demonstration script.
+Entry point for the physiological signal simulator.
 
-Usage (command line)
---------------------
-  python main.py                          # default: 5-min, 5 random events
-  python main.py --duration 600           # 10 minutes
-  python main.py --n_events 8 --noise high
-  python main.py --emotion Anger          # single emotion, 5 repetitions
-  python main.py --emotions "Anger,Fear,Surprise"  # subset
+FOLDER STRUCTURE
+----------------
+autism-physio-ai-pipeline/              <- repo root (git clone lands here)
+└── module_1a_data_simulation/          <- run ALL commands from HERE
+        main.py                         <- this file
+        outputs/                        <- all run outputs saved here
+            M1A_v1.0.0_run_001/         <- auto-created, auto-numbered
+            M1A_v1.0.0_run_002/
+
+HOW TO RUN
+----------
+  # 1. From the repo root, enter the module folder:
+  cd module_1a_data_simulation
+
+  # 2. Activate virtual environment:
+  ../.venv/Scripts/activate            (Windows)
+  source ../.venv/bin/activate         (Mac/Linux)
+
+  # 3. Run:
+  python main.py                                   # auto-numbered output
+  python main.py --duration 600                    # 10 minutes
+  python main.py --emotion Anger --n_events 4
+  python main.py --emotions "Anger,Fear,Surprise"
   python main.py --n_events random --event_dur random
-  python main.py --seed 123 --out results/run1
+  python main.py --out my_experiment               # custom folder name
 
-API usage
----------
-  from simulator import DataSimulator
-  from visualizer import SignalVisualizer
-  from exporter import DataExporter
+OUTPUT FOLDERS
+--------------
+  Every run auto-creates a new numbered subfolder:
+    outputs/M1A_v1.0.0_run_001/
+    outputs/M1A_v1.0.0_run_002/
+    ...
 
-  sim    = DataSimulator(duration_s=300, n_events=5, noise_level='medium')
-  result = sim.simulate()
-  SignalVisualizer(result, output_dir='out').save_all()
-  DataExporter(result, output_dir='out').export_all()
+  Use --out <name> to override with a custom folder name:
+    python main.py --out anger_test
+    -> saved to:  outputs/anger_test/
 =============================================================================
 """
 
@@ -31,234 +47,190 @@ from __future__ import annotations
 import argparse
 import sys
 import os
+import re
 from pathlib import Path
 
-# ── Make sure the module directory is on the path ──────────────────────────
-sys.path.insert(0, str(Path(__file__).parent))
+# Ensure module directory is on sys.path regardless of where Python is invoked
+MODULE_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(MODULE_DIR))
 
 from config import (
     EMOTIONS_ALL, DEFAULT_DURATION_S, DEFAULT_NOISE_LEVEL,
-    DEFAULT_SEED, DEFAULT_N_EVENTS,
+    DEFAULT_SEED, DEFAULT_N_EVENTS, MODULE_VERSION, MODULE_LABEL,
+    OUTPUT_ROOT,
 )
 from simulator  import DataSimulator
 from visualizer import SignalVisualizer
 from exporter   import DataExporter
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# AUTO-VERSIONED OUTPUT FOLDER
+# -----------------------------------------------------------------------------
+
+def next_run_folder(custom_name: str | None = None) -> Path:
+    """
+    Return a unique, auto-numbered output folder path and create it.
+
+    Auto-naming  ->  outputs/M1A_v1.0.0_run_001/
+                     outputs/M1A_v1.0.0_run_002/  (next available number)
+
+    Custom name  ->  outputs/<custom_name>/
+                     outputs/<custom_name>_002/   (if already exists)
+    """
+    output_root = MODULE_DIR / OUTPUT_ROOT
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    version_tag = f"{MODULE_LABEL}_v{MODULE_VERSION}"
+
+    if custom_name:
+        base = output_root / custom_name
+        if not base.exists():
+            base.mkdir(parents=True)
+            return base
+        prefix  = custom_name
+        pattern = re.compile(rf"^{re.escape(prefix)}_(\d+)$")
+    else:
+        prefix  = f"{version_tag}_run"
+        pattern = re.compile(rf"^{re.escape(version_tag)}_run_(\d+)$")
+
+    existing = [
+        int(m.group(1))
+        for d in output_root.iterdir()
+        if d.is_dir() and (m := pattern.match(d.name))
+    ]
+    next_num = (max(existing) + 1) if existing else 1
+    folder   = output_root / f"{prefix}_{next_num:03d}"
+    folder.mkdir(parents=True)
+    return folder
+
+
+# -----------------------------------------------------------------------------
 # CLI ARGUMENT PARSER
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog        = "module_1a",
-        description = "Module 1A – Physiological Signal Data Simulator for Autism AI Research",
+        prog        = "main.py",
+        description = (
+            "Module 1A – Physiological Signal Data Simulator\n"
+            "Outputs saved to:  module_1a_data_simulation/outputs/M1A_v<ver>_run_NNN/"
+        ),
+        formatter_class = argparse.RawDescriptionHelpFormatter,
     )
-    p.add_argument(
-        "--duration", type=float, default=DEFAULT_DURATION_S,
-        help=f"Recording duration in seconds (default: {DEFAULT_DURATION_S})",
-    )
-    p.add_argument(
-        "--n_events", default=str(DEFAULT_N_EVENTS),
-        help="Number of events: integer or 'random' (default: 5)",
-    )
-    p.add_argument(
-        "--event_dur", default="30",
-        help="Event duration in seconds: float or 'random' (default: 30)",
-    )
-    p.add_argument(
-        "--emotion", default=None,
-        help="Single target emotion (e.g. 'Anger'). Overrides --emotions.",
-    )
-    p.add_argument(
-        "--emotions", default=None,
-        help="Comma-separated list of target emotions (e.g. 'Anger,Fear,Sad'). "
-             "None = all random.",
-    )
-    p.add_argument(
-        "--noise", default=DEFAULT_NOISE_LEVEL, choices=["low", "medium", "high"],
-        help=f"Noise level (default: {DEFAULT_NOISE_LEVEL})",
-    )
-    p.add_argument(
-        "--seed", type=int, default=DEFAULT_SEED,
-        help=f"Random seed for reproducibility (default: {DEFAULT_SEED})",
-    )
-    p.add_argument(
-        "--out", default="output",
-        help="Output directory for CSV and PNG files (default: output/)",
-    )
-    p.add_argument(
-        "--no_plots", action="store_true",
-        help="Skip plot generation (CSV output only).",
-    )
-    p.add_argument(
-        "--list_emotions", action="store_true",
-        help="List all available emotion / behaviour labels and exit.",
-    )
+    p.add_argument("--duration",   type=float, default=DEFAULT_DURATION_S,
+                   help=f"Recording duration in seconds (default: {DEFAULT_DURATION_S})")
+    p.add_argument("--n_events",   default=str(DEFAULT_N_EVENTS),
+                   help="Number of events: integer or 'random' (default: 5)")
+    p.add_argument("--event_dur",  default="30",
+                   help="Event duration in seconds: float or 'random' (default: 30)")
+    p.add_argument("--emotion",    default=None,
+                   help="Single target emotion e.g. 'Anger'. Overrides --emotions.")
+    p.add_argument("--emotions",   default=None,
+                   help="Comma-separated emotion subset e.g. 'Anger,Fear,Sad'.")
+    p.add_argument("--noise",      default=DEFAULT_NOISE_LEVEL,
+                   choices=["low", "medium", "high"],
+                   help=f"Noise level (default: {DEFAULT_NOISE_LEVEL})")
+    p.add_argument("--seed",       type=int, default=DEFAULT_SEED,
+                   help=f"Random seed for reproducibility (default: {DEFAULT_SEED})")
+    p.add_argument("--out",        default=None,
+                   help="Custom output folder name inside outputs/. Default: auto-numbered.")
+    p.add_argument("--no_plots",   action="store_true",
+                   help="Skip PNG generation (CSV only — faster).")
+    p.add_argument("--list_emotions", action="store_true",
+                   help="Print all available emotion labels and exit.")
     return p
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ARGUMENT RESOLUTION HELPERS
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# ARGUMENT HELPERS
+# -----------------------------------------------------------------------------
 
 def resolve_n_events(val: str):
-    if val.strip().lower() == "random":
-        return "random"
-    return int(val)
-
+    return "random" if val.strip().lower() == "random" else int(val)
 
 def resolve_event_dur(val: str):
-    if val.strip().lower() == "random":
-        return "random"
-    return float(val)
-
+    return "random" if val.strip().lower() == "random" else float(val)
 
 def resolve_emotions(emotion_single, emotions_csv):
-    """Resolve mutually-exclusive emotion args."""
     if emotion_single is not None:
         if emotion_single not in EMOTIONS_ALL:
-            raise ValueError(
-                f"Unknown emotion '{emotion_single}'. Valid: {EMOTIONS_ALL}"
-            )
+            raise ValueError(f"Unknown emotion '{emotion_single}'.\nValid: {EMOTIONS_ALL}")
         return emotion_single
     if emotions_csv is not None:
         lst = [e.strip() for e in emotions_csv.split(",")]
         for e in lst:
             if e not in EMOTIONS_ALL:
-                raise ValueError(f"Unknown emotion '{e}'. Valid: {EMOTIONS_ALL}")
+                raise ValueError(f"Unknown emotion '{e}'.\nValid: {EMOTIONS_ALL}")
         return lst
-    return None   # fully random
+    return None
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN DEMO RUNNERS
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# MAIN SIMULATION RUNNER
+# -----------------------------------------------------------------------------
 
 def run_simulation(
-    duration_s:       float,
+    duration_s,
     n_events,
     event_duration_s,
     emotions,
-    noise_level:      str,
-    seed:             int,
-    output_dir:       str,
-    generate_plots:   bool = True,
+    noise_level:    str,
+    seed:           int,
+    out_name:       str | None = None,
+    generate_plots: bool       = True,
 ):
-    """End-to-end simulation, visualisation, and export."""
+    """Full pipeline: simulate -> visualise -> export."""
 
-    print("=" * 60)
-    print(" MODULE 1A – Physiological Signal Data Simulator")
+    run_folder = next_run_folder(out_name)
+    rel_path   = run_folder.relative_to(MODULE_DIR)
+
+    print("=" * 62)
+    print(" MODULE 1A  –  Physiological Signal Data Simulator")
     print(" Autism Emotion/Behaviour AI Pipeline")
-    print("=" * 60)
-    print(f" Duration     : {duration_s:.0f} s ({duration_s/60:.1f} min)")
-    print(f" Events       : {n_events}")
-    print(f" Event dur    : {event_duration_s} s")
-    print(f" Emotions     : {emotions if emotions is not None else 'random'}")
-    print(f" Noise level  : {noise_level}")
-    print(f" Seed         : {seed}")
-    print(f" Output dir   : {output_dir}")
-    print("=" * 60)
+    print("=" * 62)
+    print(f"  Module version  :  {MODULE_LABEL} v{MODULE_VERSION}")
+    print(f"  Duration        :  {duration_s:.0f} s  ({duration_s/60:.1f} min)")
+    print(f"  Events          :  {n_events}")
+    print(f"  Event duration  :  {event_duration_s} s")
+    print(f"  Emotions        :  {emotions if emotions else 'random'}")
+    print(f"  Noise level     :  {noise_level}")
+    print(f"  Seed            :  {seed}")
+    print(f"  Output folder   :  {rel_path}")
+    print("=" * 62)
 
-    # ── 1. Simulate ─────────────────────────────────────────────────────────
-    simulator = DataSimulator(
+    # 1. Simulate
+    result = DataSimulator(
         duration_s       = duration_s,
         n_events         = n_events,
         event_duration_s = event_duration_s,
         emotions         = emotions,
         noise_level      = noise_level,
         seed             = seed,
-    )
-    result = simulator.simulate()
+    ).simulate()
+
     print()
     print(result.summary())
 
-    # ── 2. Visualise ─────────────────────────────────────────────────────────
+    # 2. Visualise
     if generate_plots:
-        print("\n[Main] Generating visualisations …")
-        viz   = SignalVisualizer(result, output_dir=output_dir)
-        plots = viz.save_all()
-        print(f"  → {len(plots)} figure(s) saved to: {output_dir}/")
+        print("\n[Main] Generating visualisations ...")
+        plots = SignalVisualizer(result, output_dir=str(run_folder)).save_all()
+        print(f"  -> {len(plots)} figure(s) saved")
 
-    # ── 3. Export CSV ────────────────────────────────────────────────────────
-    print("\n[Main] Exporting data files …")
-    exporter = DataExporter(result, output_dir=output_dir)
-    files    = exporter.export_all()
-    print(f"  → {len(files)} file(s) saved to: {output_dir}/")
+    # 3. Export
+    print("\n[Main] Exporting data files ...")
+    files = DataExporter(result, output_dir=str(run_folder)).export_all()
+    print(f"  -> {len(files)} file(s) saved")
 
-    print("\n[Main] ✓ Module 1A complete.\n")
+    print(f"\n[Main] Run complete.  Output folder:")
+    print(f"       {run_folder}\n")
     return result
 
 
-def run_demo_scenarios(output_dir: str = "output_demo"):
-    """
-    Run four illustrative scenarios to showcase Module 1A capabilities.
-
-    Scenario A – Single emotion (Anger) repeated 4 times, high noise
-    Scenario B – Physiological needs subset, random duration, medium noise
-    Scenario C – Fully random (count, duration, emotion), low noise
-    Scenario D – Short burst (60 s) of Fear + Surprise, medium noise
-    """
-    scenarios = [
-        {
-            "name":        "A_Anger_repeated",
-            "duration_s":  240,
-            "n_events":    4,
-            "event_dur":   25.0,
-            "emotions":    "Anger",
-            "noise":       "high",
-            "seed":        11,
-        },
-        {
-            "name":        "B_Needs_random_dur",
-            "duration_s":  360,
-            "n_events":    5,
-            "event_dur":   "random",
-            "emotions":    ["Hunger", "Thirst", "Toilet", "Tired"],
-            "noise":       "medium",
-            "seed":        22,
-        },
-        {
-            "name":        "C_FullyRandom",
-            "duration_s":  300,
-            "n_events":    "random",
-            "event_dur":   "random",
-            "emotions":    None,
-            "noise":       "low",
-            "seed":        33,
-        },
-        {
-            "name":        "D_FearSurprise_short",
-            "duration_s":  120,
-            "n_events":    3,
-            "event_dur":   15.0,
-            "emotions":    ["Fear", "Surprise"],
-            "noise":       "medium",
-            "seed":        44,
-        },
-    ]
-
-    print("\n" + "=" * 60)
-    print("  MODULE 1A – DEMO SCENARIOS")
-    print("=" * 60)
-
-    for sc in scenarios:
-        print(f"\n▶ Scenario {sc['name']}")
-        run_simulation(
-            duration_s       = sc["duration_s"],
-            n_events         = sc["n_events"],
-            event_duration_s = sc["event_dur"],
-            emotions         = sc["emotions"],
-            noise_level      = sc["noise"],
-            seed             = sc["seed"],
-            output_dir       = f"{output_dir}/{sc['name']}",
-            generate_plots   = True,
-        )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # CLI ENTRY POINT
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 def main():
     parser = build_parser()
@@ -279,7 +251,7 @@ def main():
         ev_dur = resolve_event_dur(args.event_dur)
         emot   = resolve_emotions(args.emotion, args.emotions)
     except ValueError as e:
-        print(f"[Error] {e}")
+        print(f"\n[Error] {e}")
         sys.exit(1)
 
     run_simulation(
@@ -289,22 +261,22 @@ def main():
         emotions         = emot,
         noise_level      = args.noise,
         seed             = args.seed,
-        output_dir       = args.out,
+        out_name         = args.out,
         generate_plots   = not args.no_plots,
     )
 
 
 if __name__ == "__main__":
-    # If run without arguments, execute demo scenarios
     if len(sys.argv) == 1:
+        # No arguments -> run with defaults
         run_simulation(
-            duration_s       = 300,
-            n_events         = 5,
+            duration_s       = DEFAULT_DURATION_S,
+            n_events         = DEFAULT_N_EVENTS,
             event_duration_s = 30.0,
             emotions         = None,
-            noise_level      = "medium",
-            seed             = 42,
-            output_dir       = "output",
+            noise_level      = DEFAULT_NOISE_LEVEL,
+            seed             = DEFAULT_SEED,
+            out_name         = None,
             generate_plots   = True,
         )
     else:
