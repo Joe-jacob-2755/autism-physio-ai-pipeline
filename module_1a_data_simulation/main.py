@@ -1,86 +1,75 @@
 """
 =============================================================================
-MODULE 1A – DATA SIMULATION  |  main.py
+MODULE 1A – DATA SIMULATION  |  main.py  (v1.1.0)
 =============================================================================
-Entry point for the physiological signal simulator.
+Entry point — single-user and multi-user simulation.
 
 FOLDER STRUCTURE
 ----------------
-autism-physio-ai-pipeline/              <- repo root (git clone lands here)
-└── module_1a_data_simulation/          <- run ALL commands from HERE
-        main.py                         <- this file
-        outputs/                        <- all run outputs saved here
-            M1A_v1.0.0_run_001/         <- auto-created, auto-numbered
-            M1A_v1.0.0_run_002/
+autism-physio-ai-pipeline/
+└── module_1a_data_simulation/     <- run ALL commands from HERE
+        main.py
+        outputs/
+            M1A_v1.1.0_run_001/    <- single user
+                EDA.csv, BVP.csv, IBI.csv, ST.csv, ACC.csv
+                combined_signals.csv
+                signal_EDA.png ... combined_signals.png
+                annotations_*.csv
+                metadata.json
+
+            M1A_v1.1.0_run_002/    <- multi-user (--n_users 5)
+                user_001/          <- per-user subfolder
+                    EDA.csv ...
+                    signal_EDA.png ...
+                user_002/
+                    ...
+                user_005/
+                    ...
+                all_users_combined.csv   <- all users stacked, user_id column
+                run_summary.csv          <- one row per user, key physio params
+                metadata.json
 
 HOW TO RUN
 ----------
-  # 1. From the repo root, enter the module folder:
   cd module_1a_data_simulation
+  ..\.venv\Scripts\activate          (Windows)
+  source ../.venv/bin/activate       (Mac/Linux)
 
-  # 2. Activate virtual environment:
-  ../.venv/Scripts/activate            (Windows)
-  source ../.venv/bin/activate         (Mac/Linux)
-
-  # 3. Run:
-  python main.py                                   # auto-numbered output
-  python main.py --duration 600                    # 10 minutes
-  python main.py --emotion Anger --n_events 4
-  python main.py --emotions "Anger,Fear,Surprise"
-  python main.py --n_events random --event_dur random
-  python main.py --out my_experiment               # custom folder name
-
-OUTPUT FOLDERS
---------------
-  Every run auto-creates a new numbered subfolder:
-    outputs/M1A_v1.0.0_run_001/
-    outputs/M1A_v1.0.0_run_002/
-    ...
-
-  Use --out <name> to override with a custom folder name:
-    python main.py --out anger_test
-    -> saved to:  outputs/anger_test/
+  python main.py                                        # 1 user, defaults
+  python main.py --n_users 10                           # 10 users
+  python main.py --n_users 5 --emotions "Fear,Anger"    # 5 users, subset
+  python main.py --n_users 3 --shared_events            # same events per user
+  python main.py --emotion Anger --n_users 8            # 8 users, single emotion
 =============================================================================
 """
 
 from __future__ import annotations
 import argparse
 import sys
-import os
 import re
 from pathlib import Path
 
-# Ensure module directory is on sys.path regardless of where Python is invoked
 MODULE_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(MODULE_DIR))
 
 from config import (
     EMOTIONS_ALL, DEFAULT_DURATION_S, DEFAULT_NOISE_LEVEL,
-    DEFAULT_SEED, DEFAULT_N_EVENTS, MODULE_VERSION, MODULE_LABEL,
-    OUTPUT_ROOT,
+    DEFAULT_SEED, DEFAULT_N_EVENTS, DEFAULT_N_USERS,
+    MODULE_VERSION, MODULE_LABEL, OUTPUT_ROOT,
 )
-from simulator  import DataSimulator
-from visualizer import SignalVisualizer
-from exporter   import DataExporter
+from simulator   import DataSimulator
+from visualizer  import SignalVisualizer
+from exporter    import DataExporter, export_all_users_combined
+from user_profiles import UserProfileGenerator
 
 
-# -----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 # AUTO-VERSIONED OUTPUT FOLDER
-# -----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 
-def next_run_folder(custom_name: str | None = None) -> Path:
-    """
-    Return a unique, auto-numbered output folder path and create it.
-
-    Auto-naming  ->  outputs/M1A_v1.0.0_run_001/
-                     outputs/M1A_v1.0.0_run_002/  (next available number)
-
-    Custom name  ->  outputs/<custom_name>/
-                     outputs/<custom_name>_002/   (if already exists)
-    """
+def next_run_folder(custom_name=None) -> Path:
     output_root = MODULE_DIR / OUTPUT_ROOT
     output_root.mkdir(parents=True, exist_ok=True)
-
     version_tag = f"{MODULE_LABEL}_v{MODULE_VERSION}"
 
     if custom_name:
@@ -105,52 +94,55 @@ def next_run_folder(custom_name: str | None = None) -> Path:
     return folder
 
 
-# -----------------------------------------------------------------------------
-# CLI ARGUMENT PARSER
-# -----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
+# CLI
+# ─────────────────────────────────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog        = "main.py",
-        description = (
-            "Module 1A – Physiological Signal Data Simulator\n"
-            "Outputs saved to:  module_1a_data_simulation/outputs/M1A_v<ver>_run_NNN/"
+        prog="main.py",
+        description=(
+            "Module 1A – Physiological Signal Data Simulator (v1.1.0)\n"
+            "Single-user and multi-user simulation with per-user physiology.\n"
+            "Output: module_1a_data_simulation/outputs/M1A_v1.1.0_run_NNN/"
         ),
-        formatter_class = argparse.RawDescriptionHelpFormatter,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p.add_argument("--duration",   type=float, default=DEFAULT_DURATION_S,
+    p.add_argument("--duration",      type=float, default=DEFAULT_DURATION_S,
                    help=f"Recording duration in seconds (default: {DEFAULT_DURATION_S})")
-    p.add_argument("--n_events",   default=str(DEFAULT_N_EVENTS),
-                   help="Number of events: integer or 'random' (default: 5)")
-    p.add_argument("--event_dur",  default="30",
+    p.add_argument("--n_events",      default=str(DEFAULT_N_EVENTS),
+                   help="Events per user: integer or 'random' (default: 5)")
+    p.add_argument("--event_dur",     default="30",
                    help="Event duration in seconds: float or 'random' (default: 30)")
-    p.add_argument("--emotion",    default=None,
+    p.add_argument("--emotion",       default=None,
                    help="Single target emotion e.g. 'Anger'. Overrides --emotions.")
-    p.add_argument("--emotions",   default=None,
+    p.add_argument("--emotions",      default=None,
                    help="Comma-separated emotion subset e.g. 'Anger,Fear,Sad'.")
-    p.add_argument("--noise",      default=DEFAULT_NOISE_LEVEL,
+    p.add_argument("--noise",         default=DEFAULT_NOISE_LEVEL,
                    choices=["low", "medium", "high"],
                    help=f"Noise level (default: {DEFAULT_NOISE_LEVEL})")
-    p.add_argument("--seed",       type=int, default=DEFAULT_SEED,
-                   help=f"Random seed for reproducibility (default: {DEFAULT_SEED})")
-    p.add_argument("--out",        default=None,
-                   help="Custom output folder name inside outputs/. Default: auto-numbered.")
-    p.add_argument("--no_plots",   action="store_true",
+    p.add_argument("--seed",          type=int, default=DEFAULT_SEED,
+                   help=f"Master random seed (default: {DEFAULT_SEED})")
+    p.add_argument("--n_users",       type=int, default=DEFAULT_N_USERS,
+                   help=f"Number of users to simulate (default: {DEFAULT_N_USERS})")
+    p.add_argument("--shared_events", action="store_true",
+                   help="All users share the same event schedule. "
+                        "Default: each user gets an independent schedule.")
+    p.add_argument("--out",           default=None,
+                   help="Custom output folder name inside outputs/. "
+                        "Default: auto-numbered.")
+    p.add_argument("--no_plots",      action="store_true",
                    help="Skip PNG generation (CSV only — faster).")
     p.add_argument("--list_emotions", action="store_true",
                    help="Print all available emotion labels and exit.")
     return p
 
 
-# -----------------------------------------------------------------------------
-# ARGUMENT HELPERS
-# -----------------------------------------------------------------------------
+def resolve_n_events(val):
+    return "random" if str(val).strip().lower() == "random" else int(val)
 
-def resolve_n_events(val: str):
-    return "random" if val.strip().lower() == "random" else int(val)
-
-def resolve_event_dur(val: str):
-    return "random" if val.strip().lower() == "random" else float(val)
+def resolve_event_dur(val):
+    return "random" if str(val).strip().lower() == "random" else float(val)
 
 def resolve_emotions(emotion_single, emotions_csv):
     if emotion_single is not None:
@@ -166,71 +158,169 @@ def resolve_emotions(emotion_single, emotions_csv):
     return None
 
 
-# -----------------------------------------------------------------------------
-# MAIN SIMULATION RUNNER
-# -----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
+# SINGLE USER SIMULATION
+# ─────────────────────────────────────────────────────────────────────────────
 
-def run_simulation(
-    duration_s,
-    n_events,
-    event_duration_s,
-    emotions,
-    noise_level:    str,
-    seed:           int,
-    out_name:       str | None = None,
-    generate_plots: bool       = True,
+def simulate_one_user(
+    user_profile,
+    duration_s, n_events, event_duration_s, emotions,
+    noise_level, seed, output_dir, generate_plots,
+    shared_events=None,
 ):
-    """Full pipeline: simulate -> visualise -> export."""
+    """
+    Simulate, visualise, and export data for a single user.
 
-    run_folder = next_run_folder(out_name)
-    rel_path   = run_folder.relative_to(MODULE_DIR)
+    Parameters
+    ----------
+    shared_events : pre-built list of EventConfig to reuse (shared_events mode),
+                    or None to generate a fresh schedule.
+    """
+    # Override event schedule if shared
+    from event_scheduler import EventScheduler
+    import numpy as np
 
-    print("=" * 62)
-    print(" MODULE 1A  –  Physiological Signal Data Simulator")
-    print(" Autism Emotion/Behaviour AI Pipeline")
-    print("=" * 62)
-    print(f"  Module version  :  {MODULE_LABEL} v{MODULE_VERSION}")
-    print(f"  Duration        :  {duration_s:.0f} s  ({duration_s/60:.1f} min)")
-    print(f"  Events          :  {n_events}")
-    print(f"  Event duration  :  {event_duration_s} s")
-    print(f"  Emotions        :  {emotions if emotions else 'random'}")
-    print(f"  Noise level     :  {noise_level}")
-    print(f"  Seed            :  {seed}")
-    print(f"  Output folder   :  {rel_path}")
-    print("=" * 62)
-
-    # 1. Simulate
-    result = DataSimulator(
+    sim = DataSimulator(
         duration_s       = duration_s,
         n_events         = n_events,
         event_duration_s = event_duration_s,
         emotions         = emotions,
         noise_level      = noise_level,
         seed             = seed,
-    ).simulate()
+        user_profile     = user_profile,
+    )
 
-    print()
-    print(result.summary())
+    # If shared events provided, monkey-patch the scheduler to return them
+    if shared_events is not None:
+        sim._schedule_events = lambda: shared_events
 
-    # 2. Visualise
+    result = sim.simulate()
+
     if generate_plots:
-        print("\n[Main] Generating visualisations ...")
-        plots = SignalVisualizer(result, output_dir=str(run_folder)).save_all()
-        print(f"  -> {len(plots)} figure(s) saved")
+        SignalVisualizer(result, output_dir=str(output_dir)).save_all()
 
-    # 3. Export
-    print("\n[Main] Exporting data files ...")
-    files = DataExporter(result, output_dir=str(run_folder)).export_all()
-    print(f"  -> {len(files)} file(s) saved")
-
-    print(f"\n[Main] Run complete.  Output folder:")
-    print(f"       {run_folder}\n")
+    DataExporter(result, output_dir=str(output_dir)).export_all()
     return result
 
 
-# -----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
+# MULTI-USER RUNNER
+# ─────────────────────────────────────────────────────────────────────────────
+
+def run_simulation(
+    duration_s, n_events, event_duration_s, emotions,
+    noise_level, seed, n_users=1, shared_events_flag=False,
+    out_name=None, generate_plots=True,
+):
+    run_folder = next_run_folder(out_name)
+    rel_path   = run_folder.relative_to(MODULE_DIR)
+
+    print("=" * 64)
+    print(f"  MODULE 1A  –  Physiological Signal Data Simulator")
+    print(f"  Autism Emotion/Behaviour AI Pipeline  |  v{MODULE_VERSION}")
+    print("=" * 64)
+    print(f"  Users           :  {n_users}")
+    print(f"  Duration/user   :  {duration_s:.0f} s  ({duration_s/60:.1f} min)")
+    print(f"  Events/user     :  {n_events}")
+    print(f"  Event duration  :  {event_duration_s} s")
+    print(f"  Emotions        :  {emotions if emotions else 'random'}")
+    print(f"  Noise level     :  {noise_level}")
+    print(f"  Shared events   :  {shared_events_flag}")
+    print(f"  Master seed     :  {seed}")
+    print(f"  Output folder   :  {rel_path}")
+    print("=" * 64)
+
+    # ── Generate user physiological profiles ─────────────────────────────────
+    generator = UserProfileGenerator(n_users=n_users, master_seed=seed)
+    profiles  = generator.generate()
+
+    print(f"\n  User physiological profiles:")
+    for p in profiles:
+        print(f"   {p.summary()}")
+    print()
+
+    # ── Pre-build shared event schedule if requested ──────────────────────────
+    shared_ev = None
+    if shared_events_flag and n_users > 1:
+        from event_scheduler import EventScheduler
+        import numpy as np
+        shared_ev = EventScheduler(
+            duration_s       = duration_s,
+            n_events         = n_events,
+            event_duration_s = event_duration_s,
+            emotions         = emotions,
+            rng              = np.random.default_rng(seed),
+        ).schedule()
+        print(f"  Shared event schedule ({len(shared_ev)} events):")
+        for ev in shared_ev:
+            print(f"    {ev}")
+        print()
+
+    # ── Simulate each user ────────────────────────────────────────────────────
+    all_results = []
+
+    for profile in profiles:
+        print(f"\n{'─'*60}")
+        print(f"  Simulating {profile.user_id}  "
+              f"(EDA={profile.eda_tonic_mean:.1f}µS  "
+              f"HR={profile.hr_resting:.0f}bpm  "
+              f"react={profile.eda_reactivity:.2f}x  "
+              f"[{profile.reactivity_class}])")
+        print(f"{'─'*60}")
+
+        if n_users == 1:
+            # Single user — save directly to run_folder
+            user_dir = run_folder
+        else:
+            # Multi-user — save to user subfolder
+            user_dir = run_folder / profile.user_id
+            user_dir.mkdir(parents=True, exist_ok=True)
+
+        result = simulate_one_user(
+            user_profile     = profile,
+            duration_s       = duration_s,
+            n_events         = n_events,
+            event_duration_s = event_duration_s,
+            emotions         = emotions,
+            noise_level      = noise_level,
+            seed             = seed,
+            output_dir       = user_dir,
+            generate_plots   = generate_plots,
+            shared_events    = shared_ev,
+        )
+        all_results.append(result)
+
+    # ── Multi-user cross exports ──────────────────────────────────────────────
+    if n_users > 1:
+        print(f"\n{'─'*60}")
+        print("  Exporting cross-user files ...")
+        print(f"{'─'*60}")
+        export_all_users_combined(all_results, run_folder)
+
+        # Write metadata for the whole run
+        import json, numpy as np
+        meta = {
+            "module_version":   MODULE_VERSION,
+            "n_users":          n_users,
+            "duration_s":       duration_s,
+            "noise_level":      noise_level,
+            "master_seed":      seed,
+            "shared_events":    shared_events_flag,
+            "emotion_mode":     str(emotions),
+            "users": [r.metadata.get("user", {}) for r in all_results],
+        }
+        with open(run_folder / "metadata.json", "w") as f:
+            json.dump(meta, f, indent=2)
+        print(f"  [Exporter] Saved metadata.json")
+
+    print(f"\n  Run complete.  Output folder:")
+    print(f"  {run_folder}\n")
+    return all_results
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CLI ENTRY POINT
-# -----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 
 def main():
     parser = build_parser()
@@ -255,20 +345,21 @@ def main():
         sys.exit(1)
 
     run_simulation(
-        duration_s       = args.duration,
-        n_events         = n_ev,
-        event_duration_s = ev_dur,
-        emotions         = emot,
-        noise_level      = args.noise,
-        seed             = args.seed,
-        out_name         = args.out,
-        generate_plots   = not args.no_plots,
+        duration_s         = args.duration,
+        n_events           = n_ev,
+        event_duration_s   = ev_dur,
+        emotions           = emot,
+        noise_level        = args.noise,
+        seed               = args.seed,
+        n_users            = args.n_users,
+        shared_events_flag = args.shared_events,
+        out_name           = args.out,
+        generate_plots     = not args.no_plots,
     )
 
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
-        # No arguments -> run with defaults
         run_simulation(
             duration_s       = DEFAULT_DURATION_S,
             n_events         = DEFAULT_N_EVENTS,
@@ -276,8 +367,7 @@ if __name__ == "__main__":
             emotions         = None,
             noise_level      = DEFAULT_NOISE_LEVEL,
             seed             = DEFAULT_SEED,
-            out_name         = None,
-            generate_plots   = True,
+            n_users          = DEFAULT_N_USERS,
         )
     else:
         main()

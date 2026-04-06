@@ -266,3 +266,98 @@ class DataExporter:
         df.to_csv(out_path, index=False, float_format="%.6f")
         print(f"  [Exporter] Saved {filename}  ({len(df):,} rows)")
         return out_path
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MULTI-USER CROSS-EXPORT  (module-level function, not a class method)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def export_all_users_combined(
+    results: list,          # List[SimulationResult]
+    run_folder: "Path",
+) -> _Path:
+    """
+    Stack per-user combined_signals.csv files into one cross-user CSV.
+
+    Adds a `user_id` column as the first column.
+    Saved as:  <run_folder>/all_users_combined.csv
+
+    Also writes a run_summary.csv with one row per user showing
+    key physiological parameters and event counts.
+    """
+    frames = []
+    for result in results:
+        uid = result.user_profile.user_id if result.user_profile else "user_001"
+        # Re-build a lightweight combined frame from signals
+        from scipy.interpolate import interp1d as _interp1d
+        import numpy as _np
+
+        fs_ref = SAMPLING_RATES["BVP"]
+        t_ref  = result.time_vectors["BVP"]
+        n_ref  = len(result.signals["BVP"])
+
+        lbl, eid, cat = DataExporter(result)._labels_for_timestamps(t_ref)
+
+        df = pd.DataFrame({
+            "user_id":      uid,
+            "timestamp_s":  _np.round(t_ref, 5),
+            "target_label": lbl,
+            "event_id":     eid,
+            "category":     cat,
+            "BVP_nT":       result.signals["BVP"],
+        })
+
+        for sig_name, col in [("EDA","EDA_uS"), ("ST","ST_degC"),
+                               ("ACC_X","ACC_X_g"), ("ACC_Y","ACC_Y_g"),
+                               ("ACC_Z","ACC_Z_g")]:
+            interp = _interp1d(
+                result.time_vectors[sig_name], result.signals[sig_name],
+                kind="linear", bounds_error=False, fill_value="extrapolate")
+            df[col] = interp(t_ref)
+
+        ibi_col = _np.full(n_ref, _np.nan)
+        for bt, iv in zip(result.ibi_times_s, result.ibi_values_ms):
+            idx = int(round(bt * fs_ref))
+            if 0 <= idx < n_ref:
+                ibi_col[idx] = iv
+        df["IBI_ms"] = ibi_col
+
+        frames.append(df)
+
+    combined = pd.concat(frames, ignore_index=True)
+    out_path = Path(run_folder) / "all_users_combined.csv"
+    combined.to_csv(out_path, index=False, float_format="%.6f")
+    print(f"  [Exporter] Saved all_users_combined.csv  ({len(combined):,} rows, "
+          f"{len(results)} users)")
+
+    # ── Run summary ───────────────────────────────────────────────────────────
+    summary_rows = []
+    for result in results:
+        up  = result.user_profile
+        row = {
+            "user_id":          up.user_id if up else "user_001",
+            "n_events":         len(result.events),
+            "emotions":         ", ".join(ev.emotion for ev in result.events),
+            "duration_s":       result.duration_s,
+            "noise_level":      result.metadata.get("noise_level"),
+            "seed":             result.metadata.get("seed"),
+        }
+        if up:
+            row.update({
+                "eda_tonic_mean":   round(up.eda_tonic_mean, 3),
+                "hr_resting":       round(up.hr_resting, 1),
+                "hrv_sdnn":         round(up.hrv_sdnn, 1),
+                "st_baseline":      round(up.st_baseline, 2),
+                "eda_reactivity":   round(up.eda_reactivity, 3),
+                "hr_reactivity":    round(up.hr_reactivity, 3),
+                "movement_scale":   round(up.movement_scale, 3),
+                "reactivity_class": up.reactivity_class,
+            })
+        summary_rows.append(row)
+
+    summary_df = pd.DataFrame(summary_rows)
+    sum_path   = Path(run_folder) / "run_summary.csv"
+    summary_df.to_csv(sum_path, index=False)
+    print(f"  [Exporter] Saved run_summary.csv  ({len(summary_df)} users)")
+
+    return out_path

@@ -507,7 +507,78 @@ POWERLINE_FREQ_HZ:   float = 50.0  # EU/UK standard (use 60.0 for NA)
 # VERSION & OUTPUT STRUCTURE
 # ─────────────────────────────────────────────────────────────────────────────
 
-MODULE_VERSION: str  = "1.0.0"       # bump when module code changes
+MODULE_VERSION: str  = "1.1.0"       # bump when module code changes
 MODULE_LABEL:   str  = "M1A"         # short prefix used in output folder names
 # Output folders are auto-named:  outputs/M1A_v1.0.0_run_001/
 OUTPUT_ROOT:    str  = "outputs"     # root output folder, relative to module dir
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MULTI-USER SIMULATION — POPULATION PARAMETERS
+# Based on paediatric physiology (age 5-18) and autism research literature
+# ─────────────────────────────────────────────────────────────────────────────
+
+DEFAULT_N_USERS: int = 1
+
+# Population-level baseline distributions for child participants.
+# Each simulated user draws their personal physiology from these distributions,
+# creating realistic inter-subject variability.
+POPULATION: dict = {
+
+    "EDA": {
+        "tonic_mean_mu":    3.0,    # µS  — population mean resting SCL
+        "tonic_mean_sigma": 1.8,    # µS  — between-subject SD
+        "tonic_mean_min":   0.3,
+        "tonic_mean_max":  18.0,
+        # Reactivity multiplier on event EDA response magnitude.
+        # Autism shows wide range from hypo- to hyper-reactive.
+        "reactivity_mu":    1.0,
+        "reactivity_sigma": 0.45,
+        "reactivity_min":   0.20,
+        "reactivity_max":   2.80,
+    },
+
+    "BVP": {
+        "hr_bpm_mu":        82.0,   # bpm — children have higher HR than adults
+        "hr_bpm_sigma":     11.0,
+        "hr_bpm_min":       58.0,
+        "hr_bpm_max":      115.0,
+        "amplitude_mu":    100.0,
+        "amplitude_sigma":  18.0,
+        "reactivity_mu":    1.0,
+        "reactivity_sigma": 0.30,
+        "reactivity_min":   0.30,
+        "reactivity_max":   2.00,
+    },
+
+    "IBI": {
+        # Autism often shows reduced HRV — captured by lower hrv_sdnn values
+        "hrv_sdnn_mu":     38.0,    # ms — higher in children than adults
+        "hrv_sdnn_sigma":  14.0,
+        "hrv_sdnn_min":     8.0,
+        "hrv_sdnn_max":    85.0,
+    },
+
+    "ST": {
+        "mean_celsius_mu":   32.5,  # Children wrist temp slightly lower than adults
+        "mean_celsius_sigma": 1.4,
+        "mean_celsius_min":  28.5,
+        "mean_celsius_max":  36.5,
+    },
+
+    "ACC": {
+        # Movement varies widely — some autistic children are very still,
+        # others are hyperactive
+        "movement_scale_mu":    1.0,
+        "movement_scale_sigma": 0.40,
+        "movement_scale_min":   0.15,
+        "movement_scale_max":   2.50,
+    },
+
+    "NOISE": {
+        # Skin contact quality varies per person / session
+        "eda_contact_mu":    1.0,
+        "eda_contact_sigma": 0.25,
+        "eda_contact_min":   0.40,
+        "eda_contact_max":   1.80,
+    },
+}
