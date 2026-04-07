@@ -4,7 +4,7 @@ Autism Physio-AI Pipeline
 
 Public API
 ----------
-from module_2_data_acquisition import DataAcquisitionModule, PipelinePacket
+from module_1_data_acquisition import DataAcquisitionModule, PipelinePacket
 """
 
 import sys

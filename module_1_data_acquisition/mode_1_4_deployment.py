@@ -129,7 +129,7 @@ class DeploymentIngester:
     def _load(self, source: Path):
         """Load signal files using the same logic as the importer."""
         # Import inline to avoid circular deps
-        from mode_2_1_import import DataImporter
+        from mode_1_1_import import DataImporter
         importer = DataImporter(
             source_path = source,
             user_id     = self.user_id,

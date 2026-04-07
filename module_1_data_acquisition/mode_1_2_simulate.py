@@ -33,7 +33,7 @@ import pandas as pd
 
 # ── Locate Module 1A and add to path ─────────────────────────────────────────
 MODULE_DIR    = Path(__file__).resolve().parent
-MODULE_1A_DIR = MODULE_DIR.parent / "module_1a_data_simulation"
+MODULE_1A_DIR = MODULE_DIR.parent / "module_2a_data_simulation"
 if str(MODULE_1A_DIR) not in sys.path:
     sys.path.insert(0, str(MODULE_1A_DIR))
 
@@ -51,10 +51,10 @@ try:
         DEFAULT_NOISE_LEVEL, DEFAULT_SEED, DEFAULT_N_USERS,
         MODULE_VERSION as M1A_VERSION,
     )
-    M1A_AVAILABLE = True
+    M2A_AVAILABLE = True
 except ImportError as e:
-    M1A_AVAILABLE = False
-    M1A_IMPORT_ERROR = str(e)
+    M2A_AVAILABLE = False
+    M2A_IMPORT_ERROR = str(e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -109,11 +109,11 @@ class SimulationConnector:
         output_dir:       Optional[Path]              = None,
         verbose:          bool                        = True,
     ):
-        if not M1A_AVAILABLE:
+        if not M2A_AVAILABLE:
             raise ImportError(
-                f"Module 1A not found at {MODULE_1A_DIR}.\n"
-                f"Error: {M1A_IMPORT_ERROR}\n"
-                f"Ensure module_1a_data_simulation is in the repo root."
+                f"Module 2A not found at {MODULE_1A_DIR}.\n"
+                f"Error: {M2A_IMPORT_ERROR}\n"
+                f"Ensure module_2a_data_simulation is in the repo root."
             )
 
         self.duration_s       = float(duration_s)
@@ -137,7 +137,7 @@ class SimulationConnector:
         Single user → list of length 1
         Multi-user  → list of length n_users
         """
-        if not M1A_AVAILABLE:
+        if not M2A_AVAILABLE:
             raise ImportError("Module 1A is not available.")
 
         self._log(f"\n[Simulator 2.2] Module 1A v{M1A_VERSION} connected.")
@@ -334,7 +334,7 @@ class InteractiveSimSetup:
     Returns a dict of parameters ready to pass to SimulationConnector.
     """
 
-    EMOTIONS_ALL_STR = ", ".join(EMOTIONS_ALL) if M1A_AVAILABLE else ""
+    EMOTIONS_ALL_STR = ", ".join(EMOTIONS_ALL) if M2A_AVAILABLE else ""
 
     def collect(self) -> dict:
         print("\n" + "=" * 60)

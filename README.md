@@ -1,7 +1,7 @@
 # 🧠 Autism Physio-AI Pipeline
 
 <p align="center">
-  <img src="module_1a_data_simulation/assets/combined_signals_preview.png" alt="Physiological Signal Preview" width="860"/>
+  <img src="module_2a_data_simulation/assets/combined_signals_preview.png" alt="Physiological Signal Preview" width="860"/>
 </p>
 
 <p align="center">
@@ -80,15 +80,15 @@ All modules operate on five wearable sensor modalities:
 
 ## Getting Started
 
-Start with **Module 1A** to generate synthetic training data:
+Start with **Module 2A** to generate synthetic training data:
 
 ```bash
-cd module_1a_data_simulation
+cd module_2a_data_simulation
 pip install -r requirements.txt
 python main.py
 ```
 
-See the [Module 1A README](module_1a_data_simulation/README.md) for full documentation.
+See the [Module 2A README](module_2a_data_simulation/README.md) for full documentation.
 
 ---
 
@@ -96,7 +96,7 @@ See the [Module 1A README](module_1a_data_simulation/README.md) for full documen
 
 ```
 autism-physio-ai-pipeline/
-├── module_1a_data_simulation/   ← Synthetic data generation (v1.0.0)
+├── module_2a_data_simulation/   ← Synthetic data generation (v1.0.0)
 │   ├── README.md
 │   ├── main.py
 │   ├── config.py

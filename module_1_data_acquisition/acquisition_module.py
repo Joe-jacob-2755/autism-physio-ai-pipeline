@@ -43,7 +43,7 @@ if str(MODULE_DIR) not in sys.path:
 # ─────────────────────────────────────────────────────────────────────────────
 
 MODULE_VERSION = "1.0.0"
-MODULE_LABEL   = "M2"
+MODULE_LABEL   = "M1"
 OUTPUT_ROOT    = "outputs"
 
 MODE_IMPORT     = "2.1"
@@ -145,7 +145,7 @@ class DataAcquisitionModule:
         source_path : Module 1A output folder, or any signal CSV file
         user_id     : participant identifier
         """
-        from mode_2_1_import import DataImporter
+        from mode_1_1_import import DataImporter
         self._print_mode_header(MODE_IMPORT, source=str(source_path))
 
         packet = DataImporter(
@@ -175,7 +175,7 @@ class DataAcquisitionModule:
 
         Returns a list of PipelinePackets (one per user).
         """
-        from mode_2_2_simulate import SimulationConnector
+        from mode_1_2_simulate import SimulationConnector
         self._print_mode_header(MODE_SIMULATE,
                                 users=n_users, duration=duration_s)
 
@@ -196,7 +196,7 @@ class DataAcquisitionModule:
 
     def run_simulate_interactive(self) -> List[PipelinePacket]:
         """Mode 2.2 — Interactive simulation setup."""
-        from mode_2_2_simulate import simulate_interactive
+        from mode_1_2_simulate import simulate_interactive
         self._print_mode_header(MODE_SIMULATE)
         packets = simulate_interactive()
         return self._finalise(packets, MODE_SIMULATE)
@@ -219,7 +219,7 @@ class DataAcquisitionModule:
         speed_factor   : playback speed (10.0 = 10x faster than real time)
         max_duration_s : auto-stop after N seconds (None = manual stop)
         """
-        from mode_2_3_live import FileStreamAdapter, LiveDataCollector
+        from mode_1_3_live import FileStreamAdapter, LiveDataCollector
         self._print_mode_header(MODE_LIVE, source=str(csv_path))
 
         adapter = FileStreamAdapter(csv_path, speed_factor=speed_factor)
@@ -244,7 +244,7 @@ class DataAcquisitionModule:
 
         Requires the E4 BLE Streaming Server to be running.
         """
-        from mode_2_3_live import EmpaticaE4Adapter, LiveDataCollector
+        from mode_1_3_live import EmpaticaE4Adapter, LiveDataCollector
         self._print_mode_header(MODE_LIVE,
                                 source=f"Empatica E4 @ {host}:{port}")
 
@@ -275,7 +275,7 @@ class DataAcquisitionModule:
         user_id      : participant identifier (can be anonymised)
         strip_labels : remove any existing annotation columns
         """
-        from mode_2_4_deployment import DeploymentIngester
+        from mode_1_4_deployment import DeploymentIngester
         self._print_mode_header(MODE_DEPLOYMENT, source=str(source_path))
 
         packet = DeploymentIngester(

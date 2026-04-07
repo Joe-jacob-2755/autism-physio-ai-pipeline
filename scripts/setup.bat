@@ -64,7 +64,7 @@ if errorlevel 1 (
 REM Step 6: Smoke test
 echo.
 echo [Step 6] Running smoke test...
-cd "%REPO_ROOT%\module_1a_data_simulation"
+cd "%REPO_ROOT%\module_2a_data_simulation"
 "%VENV_DIR%\Scripts\python.exe" main.py --duration 60 --n_events 2 --noise low --seed 42 --no_plots --out output\smoke_test
 if errorlevel 1 (
     echo [ERROR] Smoke test failed

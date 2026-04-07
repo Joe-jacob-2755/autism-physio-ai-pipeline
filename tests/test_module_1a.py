@@ -11,7 +11,7 @@ From the repo root, with the virtual environment active.
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "module_1a_data_simulation"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "module_2a_data_simulation"))
 
 import numpy as np
 import pandas as pd

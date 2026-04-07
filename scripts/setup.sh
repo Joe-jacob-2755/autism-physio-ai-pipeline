@@ -44,7 +44,7 @@ info "All dependencies installed"
 
 # Smoke test
 info "Running smoke test ..."
-cd "$REPO_ROOT/module_1a_data_simulation"
+cd "$REPO_ROOT/module_2a_data_simulation"
 "$VENV_DIR/bin/python" main.py --duration 60 --n_events 2 --noise low \
   --seed 42 --no_plots --out output/smoke_test 2>&1
 info "Smoke test passed"

@@ -36,10 +36,10 @@ autism-physio-ai-pipeline/                    ← repo root
 │   └── setup.sh                             ← Mac/Linux environment setup
 │
 ├── tests/
-│   └── test_module_1a.py                     ← Module 1A test suite (35 tests)
+│   └── test_module_1a.py                     ← Module 2A test suite (35 tests)
 │
-├── module_1a_data_simulation/               ← ✅ BUILT v1.1.0
-├── module_2_data_acquisition/               ← ✅ BUILT v1.0.0
+├── module_2a_data_simulation/               ← ✅ BUILT v1.1.0
+├── module_1_data_acquisition/               ← ✅ BUILT v1.0.0
 ├── module_3_preprocessing/                  ← ✅ BUILT v1.0.0
 ├── module_4_feature_engineering/            ← 🔜 PLANNED
 ├── module_5_model_training/                 ← 🔜 PLANNED
@@ -62,13 +62,13 @@ with _isolated_import(M3_DIR):
     from preprocessor import DataPreprocessor
 
 # WRONG — causes wrong config.py to be loaded
-sys.path.insert(0, str(M1A_DIR))
+sys.path.insert(0, str(M2A_DIR))
 sys.path.insert(0, str(M3_DIR))
 from preprocessor import DataPreprocessor  # may get M1A's config
 ```
 
 ### 2. PipelinePacket data contract
-All modules pass data through `module_2_data_acquisition/pipeline_packet.py`. The `PipelinePacket` dataclass is the **only** inter-module data format. Do not bypass it.
+All modules pass data through `module_1_data_acquisition/pipeline_packet.py`. The `PipelinePacket` dataclass is the **only** inter-module data format. Do not bypass it.
 
 ```python
 PipelinePacket:
@@ -149,7 +149,7 @@ All modules operate on five wearable sensor modalities from Empatica E4 / equiva
 
 ## Participant Demographics
 
-Generated with every simulated user profile (Module 1A v1.1.0+). Passed through to Module 3 feature matrices.
+Generated with every simulated user profile (Module 2A v1.1.0+). Passed through to Module 3 feature matrices.
 
 | Field | Values | Note |
 |-------|--------|------|
@@ -191,7 +191,7 @@ Generated with every simulated user profile (Module 1A v1.1.0+). Passed through 
 
 ---
 
-## Module 1A — Data Simulation
+## Module 2A — Data Simulation
 **Status:** ✅ Built | **Version:** 1.1.0 | **Files:** 10
 
 ### Purpose
@@ -199,7 +199,7 @@ Generate synthetic, physiologically realistic physiological signals for pipeline
 
 ### Location
 ```
-module_1a_data_simulation/
+module_2a_data_simulation/
 ├── config.py           ← ALL constants: sampling rates, signal ranges,
 │                          baseline params, 10 emotion profiles,
 │                          population distributions, demographics
@@ -252,7 +252,7 @@ run_simulation(duration_s, n_events, event_duration_s, emotions,
 
 ### Output Structure
 ```
-module_1a_data_simulation/outputs/M1A_v1.1.0_run_NNN/
+module_2a_data_simulation/outputs/M2A_v1.1.0_run_NNN/
   EDA.csv, BVP.csv, IBI.csv, ST.csv, ACC.csv  ← native sampling rate
   combined_signals.csv                          ← all channels at 64 Hz
   signal_EDA.png ... combined_signals.png       ← with event timeline bar
@@ -264,7 +264,7 @@ module_1a_data_simulation/outputs/M1A_v1.1.0_run_NNN/
 
 ### Launch Commands
 ```powershell
-cd module_1a_data_simulation
+cd module_2a_data_simulation
 python main.py                                        # interactive menu
 python main.py --duration 300 --n_users 5 --seed 42
 python main.py --emotion Fear --n_events 4 --noise high
@@ -272,7 +272,7 @@ python main.py --n_users 10 --shared_events --emotions "Fear,Anger"
 python main.py --list_emotions
 ```
 
-### Config Constants (module_1a_data_simulation/config.py)
+### Config Constants (module_2a_data_simulation/config.py)
 ```python
 SAMPLING_RATES     # {EDA:4, BVP:64, IBI:None, ST:4, ACC_X:32, ...}
 SIGNAL_RANGES      # physiological min/max per channel
@@ -294,7 +294,7 @@ POWERLINE_FREQ_HZ = 50.0   # change to 60.0 for North America
 
 ---
 
-## Module 2 — Data Acquisition
+## Module 1 — Data Acquisition
 **Status:** ✅ Built | **Version:** 1.0.0 | **Files:** 7
 
 ### Purpose
@@ -302,24 +302,24 @@ Gateway for all data entering the pipeline. Routes from four sources into a stan
 
 ### Location
 ```
-module_2_data_acquisition/
+module_1_data_acquisition/
 ├── pipeline_packet.py    ← PipelinePacket dataclass (inter-module contract)
 │                            source_type, is_annotated, signals, combined,
 │                            metadata, session_id, user_id
 │                            .save() / .load() for persistence
-├── mode_2_1_import.py    ← DataImporter: load existing CSVs/folders
+├── mode_1_1_import.py    ← DataImporter: load existing CSVs/folders
 │                            Auto-detects 4 folder layouts (M1A, individual,
 │                            combined-only, single CSV)
-├── mode_2_2_simulate.py  ← SimulationConnector: calls Module 1A in-process
+├── mode_1_2_simulate.py  ← SimulationConnector: calls Module 2A in-process
 │                            InteractiveSimSetup: guided prompts
-├── mode_2_3_live.py      ← LiveDataCollector + DeviceAdapter ABC
+├── mode_1_3_live.py      ← LiveDataCollector + DeviceAdapter ABC
 │                            FileStreamAdapter: replay CSV at speed (testing)
 │                            EmpaticaE4Adapter: BLE Streaming Server (TCP)
 │                            SessionAnnotator: real-time keyboard annotation
-├── mode_2_4_deployment.py← DeploymentIngester: strips labels,
+├── mode_1_4_deployment.py← DeploymentIngester: strips labels,
 │                            sets is_annotated=False → Module 9 path
 ├── acquisition_module.py ← DataAcquisitionModule orchestrator
-│                            Auto-numbered outputs: M2_v1.0.0_mode2_X_run_NNN/
+│                            Auto-numbered outputs: M1_v1.0.0_mode2_X_run_NNN/
 └── main.py               ← Interactive menu-driven CLI
 ```
 
@@ -368,7 +368,7 @@ stop              — end recording session
 
 ### Output Structure
 ```
-module_2_data_acquisition/outputs/M2_v1.0.0_mode2_X_run_NNN/
+module_1_data_acquisition/outputs/M1_v1.0.0_mode2_X_run_NNN/
   EDA.csv, BVP.csv, IBI.csv, ST.csv, ACC.csv   ← with target_label
   combined_signals.csv
   packet_metadata.json
@@ -377,7 +377,7 @@ module_2_data_acquisition/outputs/M2_v1.0.0_mode2_X_run_NNN/
 
 ### Important Notes
 - `pipeline_packet.py` is the **only** file that should be imported by downstream modules (not mode_2_X files directly)
-- Mode 2.2 imports Module 1A in-process using `_isolated_import()` in pipeline_main.py to avoid config.py collision
+- Mode 2.2 imports Module 2A in-process using `_isolated_import()` in pipeline_main.py to avoid config.py collision
 - `FileStreamAdapter` replays any `combined_signals.csv` at configurable speed — use `speed_factor=10.0` for testing without a device
 - E4 Streaming Server must be running locally for Mode 2.3 E4 (default: `127.0.0.1:28000`)
 
@@ -785,7 +785,7 @@ module_9_deployment/logs/
 python -m pytest tests/ -v --tb=short
 ```
 
-Current tests: `tests/test_module_1a.py` — 35 tests covering Module 1A.
+Current tests: `tests/test_module_1a.py` — 35 tests covering Module 2A.
 
 ---
 
@@ -836,8 +836,8 @@ pytest>=7.4.0        # Testing
 | SQI | Signal Quality Index — 0–1 per window |
 | PipelinePacket | Standardised data container passed between modules |
 | LOSO | Leave-One-Subject-Out cross-validation |
-| M1A | Module 1A (Data Simulation) |
-| M2 | Module 2 (Data Acquisition) |
+| M2A | Module 2A (Data Simulation) |
+| M1 | Module 1 (Data Acquisition) |
 | M3 | Module 3 (Data Preprocessing) |
 | ASD | Autism Spectrum Disorder |
 | ANS | Autonomic Nervous System |

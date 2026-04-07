@@ -11,7 +11,7 @@ set -e
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_PYTHON="$REPO_ROOT/.venv/bin/python"
-MODULE_DIR="$REPO_ROOT/module_2_data_acquisition"
+MODULE_DIR="$REPO_ROOT/module_1_data_acquisition"
 MAIN_SCRIPT="$MODULE_DIR/main.py"
 
 # Check virtual environment
@@ -26,7 +26,7 @@ fi
 # Check module exists
 if [ ! -f "$MAIN_SCRIPT" ]; then
     echo ""
-    echo " [ERROR] module_2_data_acquisition/main.py not found."
+    echo " [ERROR] module_1_data_acquisition/main.py not found."
     echo " Please run:  git pull"
     echo ""
     exit 1

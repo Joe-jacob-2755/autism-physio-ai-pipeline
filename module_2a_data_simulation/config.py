@@ -508,7 +508,7 @@ POWERLINE_FREQ_HZ:   float = 50.0  # EU/UK standard (use 60.0 for NA)
 # ─────────────────────────────────────────────────────────────────────────────
 
 MODULE_VERSION: str  = "1.1.0"       # bump when module code changes
-MODULE_LABEL:   str  = "M1A"         # short prefix used in output folder names
+MODULE_LABEL:   str  = "M2A"         # short prefix used in output folder names
 # Output folders are auto-named:  outputs/M1A_v1.0.0_run_001/
 OUTPUT_ROOT:    str  = "outputs"     # root output folder, relative to module dir
 

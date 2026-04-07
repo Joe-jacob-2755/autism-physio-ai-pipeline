@@ -44,8 +44,8 @@ from typing import Optional
 REPO_ROOT = Path(__file__).resolve().parent
 
 # Module root directories
-M1A_DIR = REPO_ROOT / "module_1a_data_simulation"
-M2_DIR  = REPO_ROOT / "module_2_data_acquisition"
+M2A_DIR = REPO_ROOT / "module_2a_data_simulation"
+M1_DIR  = REPO_ROOT / "module_1_data_acquisition"
 M3_DIR  = REPO_ROOT / "module_3_preprocessing"
 
 PIPELINE_VERSION = "1.0.0"
@@ -70,7 +70,7 @@ def _isolated_import(*module_dirs: Path):
     and clear any cached modules that share names across pipeline modules.
 
     Usage:
-        with _isolated_import(M2_DIR):
+        with _isolated_import(M1_DIR):
             from acquisition_module import DataAcquisitionModule
     """
     saved_path    = list(sys.path)
@@ -207,8 +207,8 @@ def _browse_data_folder(purpose="existing data") -> Optional[Path]:
 
     candidates, labels = [], []
     for out_root, tag in [
-        (M1A_DIR / "outputs", "M1A"),
-        (M2_DIR  / "outputs", "M2"),
+        (M2A_DIR / "outputs", "M2A"),
+        (M1_DIR  / "outputs", "M1"),
         (M3_DIR  / "outputs", "M3"),
     ]:
         if out_root.exists():
@@ -380,6 +380,17 @@ def _collect_m2_params() -> dict:
 # MODULE 3 PARAMETERS
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _random_demographics(seed: int = None) -> dict:
+    """
+    Draw one participant's demographics from ASD population distributions.
+    Uses module_2a user_profiles.random_demographics() in an isolated import
+    so the 2A config is found instead of M3 config.
+    """
+    with _isolated_import(M2A_DIR):
+        from user_profiles import random_demographics as _rd
+        return _rd(seed=seed)
+
+
 def _collect_m3_params(skip_source=False) -> dict:
     params = {}
 
@@ -389,10 +400,37 @@ def _collect_m3_params(skip_source=False) -> dict:
 
     _section("👤  Participant demographics")
     print("""
-  Demographics are fused with signal features in the combined CSV.
-  Required for multimodal models. Press Enter to skip.
+  Demographics (age, gender, severity, verbal status, comorbidity) are fused
+  with signal features in the combined CSV.
+
+    1.  Random  — generate from population distributions  (default)
+    2.  Manual  — enter each field individually
+    3.  Skip    — no demographics added to features
 """)
-    if _ask_yn("Add participant demographics?", True):
+    dem_idx = _choose("Demographics mode", range(3),
+                      ["Random  — auto-generate from ASD population distributions",
+                       "Manual  — enter each field individually",
+                       "Skip    — omit demographics from feature matrix"])
+
+    if dem_idx == 0:
+        # Random — generate and show what was drawn
+        dem = _random_demographics()
+        print(f"""
+  Generated demographics:
+    Age             : {dem["age"]}
+    Gender          : {dem["gender"]}
+    Ethnicity       : {dem["ethnicity"]}
+    Autism severity : {dem["autism_severity"]}
+    Verbal status   : {dem["verbal_status"]}
+    Comorbidity     : {dem["comorbidity"]}
+""")
+        if not _ask_yn("Use these demographics?", True):
+            dem = _random_demographics()   # regenerate once more
+            print(f"  Re-generated: Age={dem["age"]}, Gender={dem["gender"]}, Severity={dem["autism_severity"]}")
+        params["demographics"] = dem
+
+    elif dem_idx == 1:
+        # Manual entry
         try:
             age = max(5, min(15, int(_ask("Age (5–15)", "10"))))
         except ValueError:
@@ -454,7 +492,7 @@ def run_module_2(params: dict) -> list:
     """Execute Module 2 with isolated sys.path so M2's config.py is found."""
     mode = params["mode"]
 
-    with _isolated_import(M2_DIR, M1A_DIR):
+    with _isolated_import(M1_DIR, M2A_DIR):
         from acquisition_module import DataAcquisitionModule
 
         acq = DataAcquisitionModule(

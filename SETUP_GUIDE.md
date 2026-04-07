@@ -107,7 +107,7 @@ If the popup doesn't appear: `Ctrl+Shift+P` → `Extensions: Show Recommended Ex
 source .venv/bin/activate       # Mac/Linux
 .venv\Scripts\activate          # Windows
 
-cd module_1a_data_simulation
+cd module_2a_data_simulation
 python main.py --duration 300 --n_events 5 --noise medium --seed 42
 ```
 
@@ -118,7 +118,7 @@ python main.py --duration 300 --n_events 5 --noise medium --seed 42
 After a simulation runs, output files appear in:
 
 ```
-module_1a_data_simulation/output/<run_name>/
+module_2a_data_simulation/output/<run_name>/
 ├── combined_signals.png    ← Open this to see all signals
 ├── signal_EDA.png
 ├── signal_BVP.png
@@ -199,7 +199,7 @@ autism-physio-ai-pipeline/
 │   └── setup.bat           ← Windows one-shot setup
 ├── tests/
 │   └── test_module_1a.py   ← Full test suite
-├── module_1a_data_simulation/
+├── module_2a_data_simulation/
 │   ├── main.py             ← Entry point
 │   ├── config.py           ← All configuration
 │   ├── simulator.py        ← Master pipeline
