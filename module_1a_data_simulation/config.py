@@ -582,3 +582,55 @@ POPULATION: dict = {
         "eda_contact_max":   1.80,
     },
 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PARTICIPANT DEMOGRAPHIC DISTRIBUTIONS
+# Added for Module 3 compatibility — demographics generated with each user
+# ─────────────────────────────────────────────────────────────────────────────
+
+PARTICIPANT_DEMOGRAPHICS: dict = {
+
+    "age": {
+        "min": 5,
+        "max": 15,
+        "distribution": "uniform",   # Uniform across childhood ASD range
+    },
+
+    "gender": {
+        # ASD diagnosed male:female ratio approx 4:1 (Loomes et al. 2017)
+        "options":       ["Male", "Female", "Non-binary"],
+        "probabilities": [0.75,   0.22,     0.03],
+    },
+
+    "ethnicity": {
+        "options":       ["White British", "Asian / Asian British",
+                          "Black / African / Caribbean",
+                          "Mixed / Multiple", "Other"],
+        "probabilities": [0.55, 0.20, 0.12, 0.08, 0.05],
+    },
+
+    "autism_severity": {
+        # DSM-5 Level 1 (mild) to Level 3 (severe)
+        "options":       ["Low", "Medium", "Severe"],
+        "probabilities": [0.40,   0.40,     0.20],
+        # Severity modulates EDA reactivity and HRV in the simulator
+        "reactivity_modifiers": {
+            "Low":    1.0,
+            "Medium": 1.3,   # Medium severity → heightened reactivity
+            "Severe": 1.6,   # Severe → strongest EDA/HR responses
+        },
+    },
+
+    "verbal_status": {
+        "options":       ["Verbal", "Minimally verbal", "Non-verbal"],
+        # Roughly reflects real clinical population distributions
+        "probabilities": [0.55,    0.25,              0.20],
+    },
+
+    "comorbidity": {
+        # Presence of at least one co-occurring condition
+        # (ADHD, anxiety, epilepsy, GI issues — common in ASD)
+        "options":       ["Yes", "No"],
+        "probabilities": [0.70,  0.30],  # ~70% have at least one comorbidity
+    },
+}
