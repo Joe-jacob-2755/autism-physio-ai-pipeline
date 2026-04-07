@@ -1,3 +1,5 @@
+# Autism Physio-AI Pipeline — root requirements
+# All modules share these dependencies
 numpy>=1.24.0
 scipy>=1.10.0
 pandas>=2.0.0
