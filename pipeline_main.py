@@ -429,10 +429,6 @@ def _collect_m3_params(skip_source=False) -> dict:
     print("""
   Demographics (age, gender, severity, verbal status, comorbidity) are fused
   with signal features in the combined CSV.
-
-    1.  Random  — generate from population distributions  (default)
-    2.  Manual  — enter each field individually
-    3.  Skip    — no demographics added to features
 """)
     dem_idx = _choose("Demographics mode", range(3),
                       ["Random  — auto-generate from ASD population distributions",
@@ -440,21 +436,22 @@ def _collect_m3_params(skip_source=False) -> dict:
                        "Skip    — omit demographics from feature matrix"])
 
     if dem_idx == 0:
-        # Random — generate and show what was drawn
+        # Random — generate a sample draw to preview, but re-draw per user at runtime
         dem = _random_demographics()
         print(f"""
-  Generated demographics:
+  Sample demographics (each user will get their own random draw):
     Age             : {dem["age"]}
     Gender          : {dem["gender"]}
     Ethnicity       : {dem["ethnicity"]}
     Autism severity : {dem["autism_severity"]}
     Verbal status   : {dem["verbal_status"]}
     Comorbidity     : {dem["comorbidity"]}
+
+  ℹ  Each participant will receive independently drawn demographics.
+     Ages are uniform 5–15. Gender/severity drawn from ASD population distributions.
 """)
-        if not _ask_yn("Use these demographics?", True):
-            dem = _random_demographics()   # regenerate once more
-            print(f"  Re-generated: Age={dem["age"]}, Gender={dem["gender"]}, Severity={dem["autism_severity"]}")
         params["demographics"] = dem
+        params["_dem_mode"] = "random"
 
     elif dem_idx == 1:
         # Manual entry

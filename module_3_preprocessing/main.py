@@ -105,48 +105,124 @@ def _browse_source() -> Path:
         print("  Invalid selection.")
 
 
+def _random_demographics(seed=None) -> dict:
+    """Draw demographics from ASD population distributions via Module 2A."""
+    m2a_dir = MODULE_DIR.parent / "module_2a_data_simulation"
+    saved_path = list(__import__('sys').path)
+    saved_modules = {k: v for k, v in __import__('sys').modules.items()
+                     if k.split('.')[0] == 'config'}
+    for k in saved_modules:
+        __import__('sys').modules.pop(k, None)
+    __import__('sys').path.insert(0, str(m2a_dir))
+    try:
+        from user_profiles import random_demographics as _rd
+        return _rd(seed=seed)
+    except Exception:
+        import random
+        return {
+            "age": random.randint(5, 15),
+            "gender": random.choice(["Male", "Female", "Non-binary"]),
+            "ethnicity": "White British",
+            "autism_severity": random.choice(["Low", "Medium", "Severe"]),
+            "verbal_status": random.choice(["Verbal", "Minimally verbal", "Non-verbal"]),
+            "comorbidity": random.choice(["Yes", "No"]),
+        }
+    finally:
+        __import__('sys').path[:] = saved_path
+        for k in list(__import__('sys').modules):
+            if k.split('.')[0] == 'config':
+                __import__('sys').modules.pop(k, None)
+        __import__('sys').modules.update(saved_modules)
+
+
+def _choose_dem(prompt, options, labels):
+    """Numbered choice menu returning selected index."""
+    print()
+    for i, lbl in enumerate(labels, 1):
+        print(f"    {i}.  {lbl}")
+    while True:
+        raw = _ask(prompt, "1").strip()
+        try:
+            idx = int(raw) - 1
+            if 0 <= idx < len(options):
+                return idx
+        except ValueError:
+            pass
+        print(f"  ✗  Enter 1–{len(options)}.")
+
+
 def _collect_demographics() -> dict:
-    """Collect participant demographics interactively."""
-    _section("👤  Participant demographics  (optional — press Enter to skip)")
+    """
+    Collect participant demographics — consistent with pipeline_main.py interface.
+
+    Three modes:
+      1. Random  — draw from ASD population distributions (default)
+                   Each participant gets independently drawn demographics,
+                   so ages and profiles differ across a multi-user session.
+      2. Manual  — enter each field individually
+      3. Skip    — no demographics appended to feature matrix
+    """
+    _section("👤  Participant demographics")
     print("""
-  Adding demographics enables demographic-stratified analysis and is
-  required for the combined feature matrix used in multimodal models.
-  If skipped, demographic columns will be absent from the output CSVs.
+  Demographics (age, gender, severity, verbal status, comorbidity) are fused
+  with signal features in the combined CSV for multimodal models.
 """)
-    if not _ask_yn("Add participant demographics?", default=True):
+    dem_idx = _choose_dem("Demographics mode", range(3), [
+        "Random  — auto-generate from ASD population distributions  (default)",
+        "Manual  — enter each field individually",
+        "Skip    — omit demographics from feature matrix",
+    ])
+
+    if dem_idx == 2:
         return {}
 
-    age_raw = _ask("Age (5–15)", "10")
+    if dem_idx == 0:
+        dem = _random_demographics()
+        print(f"""
+  Generated demographics:
+    Age             : {dem["age"]}
+    Gender          : {dem["gender"]}
+    Ethnicity       : {dem["ethnicity"]}
+    Autism severity : {dem["autism_severity"]}
+    Verbal status   : {dem["verbal_status"]}
+    Comorbidity     : {dem["comorbidity"]}
+
+  ℹ  In multi-user sessions each participant gets independently drawn
+     demographics (different ages, genders, severity levels etc.)
+""")
+        if not _ask_yn("Use these demographics?", default=True):
+            dem = _random_demographics()
+            print(f"  Re-generated: Age={dem['age']}  "
+                  f"Gender={dem['gender']}  Severity={dem['autism_severity']}")
+        return dem
+
+    # Manual entry
     try:
-        age = max(5, min(15, int(age_raw)))
+        age = max(5, min(15, int(_ask("Age (5–15)", "10"))))
     except ValueError:
         age = 10
 
-    gender_opts = ["Male", "Female", "Non-binary"]
-    print(f"\n  Gender options: {' / '.join(f'{i + 1}.{g}' for i, g in enumerate(gender_opts))}")
-    g_idx = int(_ask("Select", "1")) - 1
-    gender = gender_opts[max(0, min(g_idx, 2))]
+    gender = ["Male", "Female", "Non-binary"][_choose_dem(
+        "Gender", range(3), ["Male", "Female", "Non-binary"])]
 
-    eth_opts = ["White British", "Asian / Asian British",
-                "Black / African / Caribbean", "Mixed / Multiple", "Other"]
-    print(f"\n  Ethnicity: " + "  ".join(f"{i + 1}.{e}" for i, e in enumerate(eth_opts)))
-    e_idx = int(_ask("Select", "1")) - 1
-    ethnicity = eth_opts[max(0, min(e_idx, 4))]
+    ethnicity = [
+        "White British", "Asian / Asian British",
+        "Black / African / Caribbean", "Mixed / Multiple", "Other",
+    ][_choose_dem("Ethnicity", range(5), [
+        "White British", "Asian / Asian British",
+        "Black / African / Caribbean", "Mixed / Multiple", "Other",
+    ])]
 
-    sev_opts = ["Low", "Medium", "Severe"]
-    print(f"\n  Autism severity  (DSM-5 Level 1/2/3): "
-          + "  ".join(f"{i + 1}.{s}" for i, s in enumerate(sev_opts)))
-    s_idx = int(_ask("Select", "2")) - 1
-    severity = sev_opts[max(0, min(s_idx, 2))]
+    severity = ["Low", "Medium", "Severe"][_choose_dem(
+        "Autism severity  (DSM-5 Level)", range(3),
+        ["Low (Level 1)", "Medium (Level 2)", "Severe (Level 3)"])]
 
-    v_opts = ["Verbal", "Minimally verbal", "Non-verbal"]
-    print(f"\n  Verbal status: "
-          + "  ".join(f"{i + 1}.{v}" for i, v in enumerate(v_opts)))
-    v_idx = int(_ask("Select", "1")) - 1
-    verbal = v_opts[max(0, min(v_idx, 2))]
+    verbal = ["Verbal", "Minimally verbal", "Non-verbal"][_choose_dem(
+        "Verbal status", range(3),
+        ["Verbal", "Minimally verbal", "Non-verbal"])]
 
-    comorbidity = "Yes" if _ask_yn("Any co-occurring conditions? (ADHD, anxiety, etc.)",
-                                   default=True) else "No"
+    comorbidity = "Yes" if _ask_yn(
+        "Any co-occurring conditions? (ADHD, anxiety, etc.)", default=True) else "No"
 
     return {
         "age": age,
