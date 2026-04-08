@@ -115,6 +115,7 @@ class DataAcquisitionModule:
         save_packets: bool = True,
         out_name: str = None,
         verbose: bool = True,
+        output_dir: str = None,
     ):
         if mode not in VALID_MODES:
             raise ValueError(
@@ -128,6 +129,7 @@ class DataAcquisitionModule:
         self.save_packets = save_packets
         self.out_name = out_name
         self.verbose = verbose
+        self.output_dir = output_dir
 
     # ── Mode 2.1: Import ───────────────────────────────────────────────────
 
