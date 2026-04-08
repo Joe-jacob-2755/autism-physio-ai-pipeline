@@ -591,6 +591,7 @@ def run_module_3(
     session_id: str = "pipeline_session",
     user_id: str = "unknown",
     demographics: dict = None,
+    output_dir: str = None,
 ) -> dict:
     """Execute Module 3 with isolated sys.path so M3's config.py is found."""
     with _isolated_import(M3_DIR):
@@ -609,6 +610,7 @@ def run_module_3(
             demographics=demographics or params.get("demographics"),
             session_id=session_id,
             user_id=user_id,
+            output_dir=output_dir,
         )
 
 
@@ -619,6 +621,7 @@ def run_module_4(
     threshold_sustain_s: float = 30.0,
     session_id: str = "pipeline_session",
     user_id: str = "unknown",
+    output_dir: str = None,
 ) -> dict:
     """Execute Module 4 data analysis with isolated sys.path."""
     with _isolated_import(M4_DIR):
@@ -629,7 +632,12 @@ def run_module_4(
             threshold_sustain_s=threshold_sustain_s,
             verbose=True,
         )
-        return da.run(source=source, session_id=session_id, user_id=user_id)
+        return da.run(
+            source=source,
+            session_id=session_id,
+            user_id=user_id,
+            output_dir=output_dir,
+        )
 
 
 def _collect_m4_params() -> dict:
