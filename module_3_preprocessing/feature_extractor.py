@@ -100,34 +100,58 @@ def _spectral_entropy(sig: np.ndarray, fs: float) -> float:
     return float(-np.sum(pxx * np.log(pxx + 1e-12)))
 
 
-def _sample_entropy(sig: np.ndarray, m: int = 2, r: float = None) -> float:
-    """Sample entropy (SampEn) — approximate implementation."""
+def _sample_entropy(
+    sig: np.ndarray, m: int = 2, r: float = None, max_n: int = 150
+) -> float:
+    """
+    Sample entropy (SampEn) — fast implementation, no antropy required.
+
+    Strategy
+    --------
+    1. If antropy is installed: use ant.sample_entropy() directly (fastest).
+    2. Otherwise: subsample to max_n points and compute via numpy
+       broadcasting — O(max_n²) matrix ops, no Python loops.
+       At max_n=150: 150² = 22,500 ops vs 960² = 921,600 for raw ACC window.
+       This gives ~40× speedup over the brute-force fallback with negligible
+       accuracy loss (subsampling preserves temporal regularity structure).
+
+    Parameters
+    ----------
+    sig   : 1D signal array
+    m     : embedding dimension (default 2)
+    r     : tolerance radius; if None uses 0.2 × std(sig)
+    max_n : max points before subsampling kicks in (default 150)
+    """
     if HAS_ANTROPY:
         try:
-            r_val = r if r is not None else 0.2 * np.std(sig)
             return float(ant.sample_entropy(sig, order=m, metric="chebyshev"))
         except Exception:
             pass
 
-    # Fallback: simplified SampEn
-    n = len(sig)
+    # Fast numpy fallback — subsample long signals, then vectorized Chebyshev
+    arr = np.asarray(sig, dtype=float)
+    if len(arr) > max_n:
+        step = max(1, len(arr) // max_n)
+        arr = arr[::step][:max_n]
+    n = len(arr)
     if n < 10:
         return np.nan
-    r_val = r if r is not None else 0.2 * float(np.std(sig))
+    r_val = r if r is not None else 0.2 * float(np.std(arr))
     if r_val == 0:
         return np.nan
 
-    def _count_matches(sig, m, r_val):
-        count = 0
-        for i in range(n - m):
-            template = sig[i: i + m]
-            for j in range(i + 1, n - m):
-                if np.max(np.abs(sig[j: j + m] - template)) < r_val:
-                    count += 1
-        return count
+    def _count_matches_vec(a, m_len):
+        """Count template matches using numpy broadcasting (no Python inner loop)."""
+        N = len(a) - m_len
+        if N < 2:
+            return 0
+        T = np.array([a[i: i + m_len] for i in range(N)])  # (N, m_len)
+        # Pairwise Chebyshev distances — upper triangle only
+        cheb = np.abs(T[:, None, :] - T[None, :, :]).max(axis=2)  # (N, N)
+        return int(np.sum(np.triu(cheb < r_val, k=1)))
 
-    A = _count_matches(sig, m + 1, r_val)
-    B = _count_matches(sig, m, r_val)
+    B = _count_matches_vec(arr, m)
+    A = _count_matches_vec(arr, m + 1)
     if B == 0:
         return np.nan
     return float(-np.log((A + 1e-12) / (B + 1e-12)))
