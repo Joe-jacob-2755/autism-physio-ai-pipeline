@@ -62,7 +62,7 @@ def _band_power(sig: np.ndarray, fs: float, lo: float, hi: float) -> float:
     if nperseg < 8:
         return np.nan
     f, pxx = sp_signal.welch(sig, fs=fs, nperseg=nperseg)
-    mask    = (f >= lo) & (f <= hi)
+    mask = (f >= lo) & (f <= hi)
     return float(np.trapezoid(pxx[mask], f[mask])) if mask.sum() > 1 else np.nan
 
 
@@ -72,9 +72,9 @@ def _dominant_freq(sig: np.ndarray, fs: float,
     nperseg = min(256, len(sig) // 2)
     if nperseg < 8:
         return np.nan
-    f, pxx  = sp_signal.welch(sig, fs=fs, nperseg=nperseg)
-    fmax    = fmax or fs / 2
-    mask    = (f >= fmin) & (f <= fmax)
+    f, pxx = sp_signal.welch(sig, fs=fs, nperseg=nperseg)
+    fmax = fmax or fs / 2
+    mask = (f >= fmin) & (f <= fmax)
     if not mask.any():
         return np.nan
     return float(f[mask][np.argmax(pxx[mask])])
@@ -85,8 +85,8 @@ def _spectral_centroid(sig: np.ndarray, fs: float) -> float:
     nperseg = min(256, len(sig) // 2)
     if nperseg < 8:
         return np.nan
-    f, pxx  = sp_signal.welch(sig, fs=fs, nperseg=nperseg)
-    tot     = pxx.sum()
+    f, pxx = sp_signal.welch(sig, fs=fs, nperseg=nperseg)
+    tot = pxx.sum()
     return float(np.dot(f, pxx) / tot) if tot > 0 else np.nan
 
 
@@ -95,8 +95,8 @@ def _spectral_entropy(sig: np.ndarray, fs: float) -> float:
     nperseg = min(256, len(sig) // 2)
     if nperseg < 8:
         return np.nan
-    _, pxx  = sp_signal.welch(sig, fs=fs, nperseg=nperseg)
-    pxx    /= (pxx.sum() + 1e-12)
+    _, pxx = sp_signal.welch(sig, fs=fs, nperseg=nperseg)
+    pxx /= (pxx.sum() + 1e-12)
     return float(-np.sum(pxx * np.log(pxx + 1e-12)))
 
 
@@ -109,14 +109,7 @@ def _sample_entropy(sig: np.ndarray, m: int = 2, r: float = None) -> float:
         except Exception:
             pass
 
-    # Fallback: simplified SampEn with NumPy vectorisation.
-    # Subsample to ≤300 points (standard practice — SampEn is reliable at
-    # this length and avoids O(n²) cost on high-rate signals like ACC).
-    MAX_N = 300
-    if len(sig) > MAX_N:
-        step = len(sig) // MAX_N
-        sig  = sig[::step][:MAX_N]
-
+    # Fallback: simplified SampEn
     n = len(sig)
     if n < 10:
         return np.nan
@@ -124,17 +117,17 @@ def _sample_entropy(sig: np.ndarray, m: int = 2, r: float = None) -> float:
     if r_val == 0:
         return np.nan
 
-    def _count_matches_vec(sig: np.ndarray, m: int, r_val: float) -> int:
-        """Vectorised template matching — O(n²) but in NumPy, not Python."""
-        templates = np.lib.stride_tricks.sliding_window_view(sig, m)  # (n-m+1, m)
+    def _count_matches(sig, m, r_val):
         count = 0
-        for i in range(len(templates) - 1):
-            diffs = np.max(np.abs(templates[i + 1:] - templates[i]), axis=1)
-            count += int(np.sum(diffs < r_val))
+        for i in range(n - m):
+            template = sig[i: i + m]
+            for j in range(i + 1, n - m):
+                if np.max(np.abs(sig[j: j + m] - template)) < r_val:
+                    count += 1
         return count
 
-    A = _count_matches_vec(sig, m + 1, r_val)
-    B = _count_matches_vec(sig, m, r_val)
+    A = _count_matches(sig, m + 1, r_val)
+    B = _count_matches(sig, m, r_val)
     if B == 0:
         return np.nan
     return float(-np.log((A + 1e-12) / (B + 1e-12)))
@@ -150,7 +143,7 @@ def _zero_crossing_rate(sig: np.ndarray) -> float:
 
 
 def _detect_scr_peaks(phasic: np.ndarray, fs: float,
-                       min_amp: float = 0.02) -> Tuple[np.ndarray, np.ndarray]:
+                      min_amp: float = 0.02) -> Tuple[np.ndarray, np.ndarray]:
     """Detect SCR peaks in phasic EDA component."""
     if len(phasic) < 4:
         return np.array([]), np.array([])
@@ -170,7 +163,7 @@ def _decompose_eda(eda: np.ndarray, fs: float):
     from signal_filters import butterworth_lowpass
     if len(eda) < 20:
         return eda, np.zeros_like(eda)
-    tonic  = butterworth_lowpass(eda, fs, cutoff=0.05, order=2)
+    tonic = butterworth_lowpass(eda, fs, cutoff=0.05, order=2)
     phasic = eda - tonic
     phasic = np.maximum(phasic, 0)   # SCRs are positive deflections
     return tonic, phasic
@@ -179,7 +172,7 @@ def _decompose_eda(eda: np.ndarray, fs: float):
 def _detect_bvp_peaks(bvp: np.ndarray, fs: float):
     """Detect systolic peaks in BVP/PPG signal."""
     min_dist = max(1, int(0.4 * fs))   # minimum 0.4 s (150 bpm max)
-    height   = np.percentile(bvp, 60)  # peaks above 60th percentile
+    height = np.percentile(bvp, 60)  # peaks above 60th percentile
     peaks, _ = sp_signal.find_peaks(bvp, distance=min_dist, height=height)
     return peaks
 
@@ -212,22 +205,22 @@ def _dfa_alpha1(rr: np.ndarray) -> float:
             pass
 
     # Simplified DFA
-    n   = len(rr)
+    n = len(rr)
     if n < 20:
         return np.nan
     scales = [4, 6, 8, 12, 16]
-    flucs  = []
+    flucs = []
     for s in scales:
         if n < 2 * s:
             continue
         n_seg = n // s
         rms_list = []
-        cumsum   = np.cumsum(rr - np.mean(rr))
+        cumsum = np.cumsum(rr - np.mean(rr))
         for i in range(n_seg):
-            seg  = cumsum[i * s: (i + 1) * s]
-            t    = np.arange(len(seg))
+            seg = cumsum[i * s: (i + 1) * s]
+            t = np.arange(len(seg))
             poly = np.polyfit(t, seg, 1)
-            trend= np.polyval(poly, t)
+            trend = np.polyval(poly, t)
             rms_list.append(np.sqrt(np.mean((seg - trend) ** 2)))
         if rms_list:
             flucs.append((np.log(s), np.log(np.mean(rms_list))))
@@ -235,7 +228,7 @@ def _dfa_alpha1(rr: np.ndarray) -> float:
     if len(flucs) < 2:
         return np.nan
     xs, ys = zip(*flucs)
-    poly   = np.polyfit(xs, ys, 1)
+    poly = np.polyfit(xs, ys, 1)
     return float(poly[0])
 
 
@@ -244,30 +237,30 @@ def _dfa_alpha1(rr: np.ndarray) -> float:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def extract_eda_features(sig: np.ndarray, fs: float,
-                          baseline_mean: float = None) -> dict:
+                         baseline_mean: float = None) -> dict:
     """Extract all 18 EDA features."""
     f = {}
     if len(sig) < MIN_WINDOW_SAMPLES:
         return f
 
     tonic, phasic = _decompose_eda(sig, fs)
-    peaks, amps   = _detect_scr_peaks(phasic, fs)
-    dur_s         = len(sig) / fs
-    base          = baseline_mean if baseline_mean else np.median(tonic)
+    peaks, amps = _detect_scr_peaks(phasic, fs)
+    dur_s = len(sig) / fs
+    base = baseline_mean if baseline_mean else np.median(tonic)
 
     # ── Level 1: Derived ─────────────────────────────────────────────
-    f["eda_scl_mean"]       = _safe(np.mean(tonic))
-    f["eda_scl_slope"]      = _safe(np.polyfit(np.arange(len(tonic)), tonic, 1)[0])
-    f["eda_scr_count"]      = _safe(len(peaks))
-    f["eda_scr_rate"]       = _safe(len(peaks) / dur_s if dur_s > 0 else 0)
-    f["eda_scr_amp_mean"]   = _safe(np.mean(amps) if len(amps) > 0 else 0)
-    f["eda_scr_amp_max"]    = _safe(np.max(amps)  if len(amps) > 0 else 0)
+    f["eda_scl_mean"] = _safe(np.mean(tonic))
+    f["eda_scl_slope"] = _safe(np.polyfit(np.arange(len(tonic)), tonic, 1)[0])
+    f["eda_scr_count"] = _safe(len(peaks))
+    f["eda_scr_rate"] = _safe(len(peaks) / dur_s if dur_s > 0 else 0)
+    f["eda_scr_amp_mean"] = _safe(np.mean(amps) if len(amps) > 0 else 0)
+    f["eda_scr_amp_max"] = _safe(np.max(amps) if len(amps) > 0 else 0)
     # Rise time: estimate as time from trough before peak to peak
     if len(peaks) > 0:
         rise_times = []
         for pk in peaks:
             start = max(0, pk - int(2 * fs))
-            seg   = phasic[start:pk]
+            seg = phasic[start:pk]
             if len(seg) > 0:
                 trough_idx = np.argmin(seg)
                 rise_times.append((pk - (start + trough_idx)) / fs)
@@ -284,23 +277,23 @@ def extract_eda_features(sig: np.ndarray, fs: float,
         f["eda_scr_rec_time"] = _safe(np.nanmean(rec_times) if rec_times else np.nan)
     else:
         f["eda_scr_rise_mean"] = 0.0
-        f["eda_scr_rec_time"]  = 0.0
+        f["eda_scr_rec_time"] = 0.0
     f["eda_scr_auc"] = _safe(np.trapezoid(np.maximum(phasic, 0)) / fs)
 
     # ── Level 2: Time domain ─────────────────────────────────────────
-    f["eda_mean"]     = _safe(np.mean(sig))
-    f["eda_std"]      = _safe(np.std(sig))
-    f["eda_min"]      = _safe(np.min(sig))
-    f["eda_max"]      = _safe(np.max(sig))
-    f["eda_range"]    = _safe(np.max(sig) - np.min(sig))
-    f["eda_skew"]     = _safe(skew(sig))
-    f["eda_kurt"]     = _safe(kurtosis(sig))
-    f["eda_zcr"]      = _safe(_zero_crossing_rate(sig) * fs)
+    f["eda_mean"] = _safe(np.mean(sig))
+    f["eda_std"] = _safe(np.std(sig))
+    f["eda_min"] = _safe(np.min(sig))
+    f["eda_max"] = _safe(np.max(sig))
+    f["eda_range"] = _safe(np.max(sig) - np.min(sig))
+    f["eda_skew"] = _safe(skew(sig))
+    f["eda_kurt"] = _safe(kurtosis(sig))
+    f["eda_zcr"] = _safe(_zero_crossing_rate(sig) * fs)
 
     # ── Level 2: Frequency domain ────────────────────────────────────
     bands = FREQ_BANDS.get("EDA", {})
-    f["eda_pow_vlf"]       = _safe(_band_power(sig, fs, *bands.get("vlf", (0, 0.05))))
-    f["eda_pow_scr"]       = _safe(_band_power(sig, fs, *bands.get("scr", (0.05, 0.25))))
+    f["eda_pow_vlf"] = _safe(_band_power(sig, fs, *bands.get("vlf", (0, 0.05))))
+    f["eda_pow_scr"] = _safe(_band_power(sig, fs, *bands.get("scr", (0.05, 0.25))))
     f["eda_spec_centroid"] = _safe(_spectral_centroid(sig, fs))
 
     # ── Level 2: Non-linear ──────────────────────────────────────────
@@ -319,10 +312,10 @@ def extract_bvp_features(sig: np.ndarray, fs: float) -> dict:
 
     # ── Level 1: Derived (beat morphology) ──────────────────────────
     if len(peaks) >= 2:
-        rr_ms   = np.diff(peaks) / fs * 1000
+        rr_ms = np.diff(peaks) / fs * 1000
         hr_inst = 60_000 / rr_ms
         f["bvp_hr_mean"] = _safe(np.mean(hr_inst))
-        f["bvp_hr_std"]  = _safe(np.std(hr_inst))
+        f["bvp_hr_std"] = _safe(np.std(hr_inst))
 
         # Systolic amplitude
         amp_vals = sig[peaks]
@@ -333,8 +326,8 @@ def extract_bvp_features(sig: np.ndarray, fs: float) -> dict:
         for i in range(len(peaks) - 1):
             seg = sig[peaks[i]:peaks[i + 1]]
             if len(seg) > 3:
-                mid    = len(seg) // 2
-                notch  = np.min(seg[mid // 2: mid + mid // 2])
+                mid = len(seg) // 2
+                notch = np.min(seg[mid // 2: mid + mid // 2])
                 notch_depths.append(sig[peaks[i]] - notch)
         f["bvp_notch_depth"] = _safe(np.mean(notch_depths) if notch_depths else np.nan)
 
@@ -346,7 +339,7 @@ def extract_bvp_features(sig: np.ndarray, fs: float) -> dict:
             beat_seg = sig[lo_bound:hi_bound]
             peak_amp = sig[pk]
             half_amp = peak_amp * 0.5
-            above    = beat_seg > half_amp
+            above = beat_seg > half_amp
             if above.sum() > 0:
                 pw50_list.append(above.sum() / fs * 1000)
         f["bvp_pw50"] = _safe(np.mean(pw50_list) if pw50_list else np.nan)
@@ -358,8 +351,8 @@ def extract_bvp_features(sig: np.ndarray, fs: float) -> dict:
         aug_list = []
         for pk in peaks:
             seg_start = max(0, pk - int(0.1 * fs))
-            seg_end   = min(len(sig), pk + int(0.7 * fs))
-            seg       = sig[seg_start:seg_end]
+            seg_end = min(len(sig), pk + int(0.7 * fs))
+            seg = sig[seg_start:seg_end]
             if len(seg) > 4:
                 second_half = seg[len(seg) // 2:]
                 if second_half.max() > 0 and sig[pk] > 0:
@@ -372,15 +365,15 @@ def extract_bvp_features(sig: np.ndarray, fs: float) -> dict:
 
     # ── Level 2: Time domain ─────────────────────────────────────────
     f["bvp_mean"] = _safe(np.mean(sig))
-    f["bvp_std"]  = _safe(np.std(sig))
+    f["bvp_std"] = _safe(np.std(sig))
     f["bvp_skew"] = _safe(skew(sig))
     f["bvp_kurt"] = _safe(kurtosis(sig))
 
     # ── Level 2: Frequency domain ────────────────────────────────────
-    f["bvp_f0"]          = _safe(_dominant_freq(sig, fs, 0.5, 3.5))
-    f["bvp_resp_mod"]    = _safe(_band_power(sig, fs, 0.15, 0.4))
-    f["bvp_harm_ratio"]  = _safe(_spectral_entropy(sig, fs))   # spectral regularity proxy
-    f["bvp_spec_entropy"]= _safe(_spectral_entropy(sig, fs))
+    f["bvp_f0"] = _safe(_dominant_freq(sig, fs, 0.5, 3.5))
+    f["bvp_resp_mod"] = _safe(_band_power(sig, fs, 0.15, 0.4))
+    f["bvp_harm_ratio"] = _safe(_spectral_entropy(sig, fs))   # spectral regularity proxy
+    f["bvp_spec_entropy"] = _safe(_spectral_entropy(sig, fs))
     # Signal quality index: peak regularity
     if len(peaks) >= 3:
         rr_var = np.std(np.diff(peaks)) / (np.mean(np.diff(peaks)) + 1e-12)
@@ -403,65 +396,65 @@ def extract_ibi_features(
 
     # Remove ectopic beats (>20% deviation from local median)
     rr_med = np.median(rr)
-    valid  = np.abs(rr - rr_med) / (rr_med + 1e-12) < 0.20
+    valid = np.abs(rr - rr_med) / (rr_med + 1e-12) < 0.20
     times_in = times_in[valid]
-    rr     = rr[valid]
+    rr = rr[valid]
     if len(rr) < 4:
         return f
 
     # ── Level 1: Derived ─────────────────────────────────────────────
-    f["ibi_mean"]  = _safe(np.mean(rr))
-    f["ibi_sdnn"]  = _safe(np.std(rr, ddof=1))
-    diff_rr        = np.diff(rr)
+    f["ibi_mean"] = _safe(np.mean(rr))
+    f["ibi_sdnn"] = _safe(np.std(rr, ddof=1))
+    diff_rr = np.diff(rr)
     f["ibi_rmssd"] = _safe(np.sqrt(np.mean(diff_rr ** 2)))
     f["ibi_pnn50"] = _safe(np.sum(np.abs(diff_rr) > 50) / len(diff_rr) * 100
                            if len(diff_rr) > 0 else 0)
-    f["ibi_cv"]    = _safe(f["ibi_sdnn"] / (f["ibi_mean"] + 1e-12) * 100)
+    f["ibi_cv"] = _safe(f["ibi_sdnn"] / (f["ibi_mean"] + 1e-12) * 100)
 
     # ── Level 2: Frequency domain (interpolate RR to uniform grid) ──
     if len(rr) >= 8 and len(times_in) >= 8:
-        t_rr   = times_in
+        t_rr = times_in
         if len(t_rr) != len(rr):
             t_rr = np.cumsum(rr / 1000)
-        dur    = t_rr[-1] - t_rr[0]
-        fs_rr  = 4.0   # interpolation rate for HRV
-        t_uni  = np.arange(t_rr[0], t_rr[-1], 1 / fs_rr)
+        dur = t_rr[-1] - t_rr[0]
+        fs_rr = 4.0   # interpolation rate for HRV
+        t_uni = np.arange(t_rr[0], t_rr[-1], 1 / fs_rr)
         if len(t_uni) >= 8:
             rr_uni = np.interp(t_uni, t_rr, rr)
-            bands  = FREQ_BANDS.get("IBI", {})
-            vlf    = _band_power(rr_uni, fs_rr, *bands.get("vlf", (0.0, 0.04)))
-            lf     = _band_power(rr_uni, fs_rr, *bands.get("lf",  (0.04, 0.15)))
-            hf     = _band_power(rr_uni, fs_rr, *bands.get("hf",  (0.15, 0.40)))
-            f["ibi_vlf"]       = _safe(vlf)
-            f["ibi_lf"]        = _safe(lf)
-            f["ibi_hf"]        = _safe(hf)
-            tot                = (lf or 0) + (hf or 0) + 1e-12
-            f["ibi_lf_hf"]     = _safe((lf or 0) / (hf + 1e-12))
-            f["ibi_lfnu"]      = _safe((lf or 0) / tot * 100)
-            f["ibi_hfnu"]      = _safe((hf or 0) / tot * 100)
+            bands = FREQ_BANDS.get("IBI", {})
+            vlf = _band_power(rr_uni, fs_rr, *bands.get("vlf", (0.0, 0.04)))
+            lf = _band_power(rr_uni, fs_rr, *bands.get("lf", (0.04, 0.15)))
+            hf = _band_power(rr_uni, fs_rr, *bands.get("hf", (0.15, 0.40)))
+            f["ibi_vlf"] = _safe(vlf)
+            f["ibi_lf"] = _safe(lf)
+            f["ibi_hf"] = _safe(hf)
+            tot = (lf or 0) + (hf or 0) + 1e-12
+            f["ibi_lf_hf"] = _safe((lf or 0) / (hf + 1e-12))
+            f["ibi_lfnu"] = _safe((lf or 0) / tot * 100)
+            f["ibi_hfnu"] = _safe((hf or 0) / tot * 100)
             f["ibi_total_pow"] = _safe((vlf or 0) + (lf or 0) + (hf or 0))
         else:
-            for k in ("ibi_vlf","ibi_lf","ibi_hf","ibi_lf_hf",
-                      "ibi_lfnu","ibi_hfnu","ibi_total_pow"):
+            for k in ("ibi_vlf", "ibi_lf", "ibi_hf", "ibi_lf_hf",
+                      "ibi_lfnu", "ibi_hfnu", "ibi_total_pow"):
                 f[k] = np.nan
     else:
-        for k in ("ibi_vlf","ibi_lf","ibi_hf","ibi_lf_hf",
-                  "ibi_lfnu","ibi_hfnu","ibi_total_pow"):
+        for k in ("ibi_vlf", "ibi_lf", "ibi_hf", "ibi_lf_hf",
+                  "ibi_lfnu", "ibi_hfnu", "ibi_total_pow"):
             f[k] = np.nan
 
     # ── Level 2: Non-linear ──────────────────────────────────────────
-    sd1, sd2         = _poincare(rr)
-    f["ibi_sd1"]     = _safe(sd1)
-    f["ibi_sd2"]     = _safe(sd2)
+    sd1, sd2 = _poincare(rr)
+    f["ibi_sd1"] = _safe(sd1)
+    f["ibi_sd2"] = _safe(sd2)
     f["ibi_sd1_sd2"] = _safe(sd1 / (sd2 + 1e-12) if sd2 else np.nan)
-    f["ibi_sampen"]  = _safe(_sample_entropy(rr))
+    f["ibi_sampen"] = _safe(_sample_entropy(rr))
     f["ibi_dfa_alpha1"] = _safe(_dfa_alpha1(rr))
 
     return f
 
 
 def extract_st_features(sig: np.ndarray, fs: float,
-                         baseline_mean: float = None) -> dict:
+                        baseline_mean: float = None) -> dict:
     """Extract all 10 ST features."""
     f = {}
     if len(sig) < MIN_WINDOW_SAMPLES:
@@ -470,19 +463,19 @@ def extract_st_features(sig: np.ndarray, fs: float,
     base = baseline_mean if baseline_mean else np.median(sig)
 
     # ── Level 1: Derived ─────────────────────────────────────────────
-    f["st_mean"]        = _safe(np.mean(sig))
-    f["st_delta"]       = _safe(np.mean(sig) - base)
-    t                   = np.arange(len(sig)) / fs / 60   # minutes
-    slope               = np.polyfit(t, sig, 1)[0]
+    f["st_mean"] = _safe(np.mean(sig))
+    f["st_delta"] = _safe(np.mean(sig) - base)
+    t = np.arange(len(sig)) / fs / 60   # minutes
+    slope = np.polyfit(t, sig, 1)[0]
     f["st_rate_change"] = _safe(slope / 60)   # convert /min to /s
-    f["st_slope"]       = _safe(slope)
-    f["st_asymmetry"]   = np.nan  # requires dual-wrist device
+    f["st_slope"] = _safe(slope)
+    f["st_asymmetry"] = np.nan  # requires dual-wrist device
 
     # ── Level 2: Time domain ─────────────────────────────────────────
-    f["st_min"]   = _safe(np.min(sig))
-    f["st_max"]   = _safe(np.max(sig))
+    f["st_min"] = _safe(np.min(sig))
+    f["st_max"] = _safe(np.max(sig))
     f["st_range"] = _safe(np.max(sig) - np.min(sig))
-    f["st_std"]   = _safe(np.std(sig))
+    f["st_std"] = _safe(np.std(sig))
 
     # Autocorrelation lag-1
     if len(sig) > 2:
@@ -497,7 +490,7 @@ def extract_st_features(sig: np.ndarray, fs: float,
     # ── Level 2: Frequency domain ────────────────────────────────────
     bands = FREQ_BANDS.get("ST", {})
     f["st_pow_ultra_slow"] = _safe(_band_power(sig, fs, *bands.get("ultra_slow", (0.0, 0.003))))
-    f["st_pow_slow"]       = _safe(_band_power(sig, fs, *bands.get("slow", (0.003, 0.04))))
+    f["st_pow_slow"] = _safe(_band_power(sig, fs, *bands.get("slow", (0.003, 0.04))))
 
     return f
 
@@ -516,10 +509,10 @@ def extract_acc_features(
     svm_dyn = svm - np.mean(svm)
 
     # ── Level 1: Derived ─────────────────────────────────────────────
-    f["acc_svm_mean"]         = _safe(np.mean(svm))
-    f["acc_svm_std"]          = _safe(np.std(svm))
-    f["acc_activity_count"]   = _safe(np.sum(np.abs(np.diff(svm))))
-    f["acc_dom_freq"]         = _safe(_dominant_freq(svm_dyn, fs, 0.1, 15.0))
+    f["acc_svm_mean"] = _safe(np.mean(svm))
+    f["acc_svm_std"] = _safe(np.std(svm))
+    f["acc_activity_count"] = _safe(np.sum(np.abs(np.diff(svm))))
+    f["acc_dom_freq"] = _safe(_dominant_freq(svm_dyn, fs, 0.1, 15.0))
 
     # Orientation (static component = mean per axis)
     f["acc_x_mean"] = _safe(np.mean(acc_x))
@@ -528,16 +521,16 @@ def extract_acc_features(
 
     # Postural transitions: large SVM derivative spikes
     svm_diff = np.abs(np.diff(svm))
-    thresh   = np.mean(svm_diff) + 3 * np.std(svm_diff)
+    thresh = np.mean(svm_diff) + 3 * np.std(svm_diff)
     f["acc_posture_trans"] = _safe(np.sum(svm_diff > thresh))
 
     # ── Level 2: Time domain ─────────────────────────────────────────
-    f["acc_x_std"]   = _safe(np.std(acc_x))
-    f["acc_y_std"]   = _safe(np.std(acc_y))
-    f["acc_z_std"]   = _safe(np.std(acc_z))
+    f["acc_x_std"] = _safe(np.std(acc_x))
+    f["acc_y_std"] = _safe(np.std(acc_y))
+    f["acc_z_std"] = _safe(np.std(acc_z))
     f["acc_svm_range"] = _safe(np.max(svm) - np.min(svm))
-    f["acc_svm_skew"]  = _safe(skew(svm))
-    f["acc_svm_kurt"]  = _safe(kurtosis(svm))
+    f["acc_svm_skew"] = _safe(skew(svm))
+    f["acc_svm_kurt"] = _safe(kurtosis(svm))
 
     # Zero-crossing rate per axis (detrended)
     f["acc_x_zcr"] = _safe(_zero_crossing_rate(acc_x - np.mean(acc_x)) * fs)
@@ -546,11 +539,11 @@ def extract_acc_features(
 
     # ── Level 2: Frequency domain ────────────────────────────────────
     bands = FREQ_BANDS.get("ACC", {})
-    f["acc_pow_sway"]      = _safe(_band_power(svm_dyn, fs, *bands.get("sway",      (0.0,  1.0))))
-    f["acc_pow_voluntary"] = _safe(_band_power(svm_dyn, fs, *bands.get("voluntary", (1.0,  3.0))))
-    f["acc_pow_rapid"]     = _safe(_band_power(svm_dyn, fs, *bands.get("rapid",     (3.0,  8.0))))
-    f["acc_pow_tremor"]    = _safe(_band_power(svm_dyn, fs, *bands.get("tremor",    (8.0, 16.0))))
-    f["acc_spec_entropy"]  = _safe(_spectral_entropy(svm_dyn, fs))
+    f["acc_pow_sway"] = _safe(_band_power(svm_dyn, fs, *bands.get("sway", (0.0, 1.0))))
+    f["acc_pow_voluntary"] = _safe(_band_power(svm_dyn, fs, *bands.get("voluntary", (1.0, 3.0))))
+    f["acc_pow_rapid"] = _safe(_band_power(svm_dyn, fs, *bands.get("rapid", (3.0, 8.0))))
+    f["acc_pow_tremor"] = _safe(_band_power(svm_dyn, fs, *bands.get("tremor", (8.0, 16.0))))
+    f["acc_spec_entropy"] = _safe(_spectral_entropy(svm_dyn, fs))
 
     # Cross-axis correlations
     try:
@@ -584,18 +577,18 @@ class FeatureExtractor:
     def __init__(
         self,
         window_s: float = WINDOW_SIZE_S,
-        overlap:  float = WINDOW_OVERLAP,
-        verbose:  bool  = True,
+        overlap: float = WINDOW_OVERLAP,
+        verbose: bool = True,
     ):
         self.window_s = window_s
-        self.overlap  = overlap
-        self.verbose  = verbose
+        self.overlap = overlap
+        self.verbose = verbose
 
     def extract_all(
         self,
-        signals:    Dict[str, pd.DataFrame],
+        signals: Dict[str, pd.DataFrame],
         session_id: str = "unknown",
-        user_id:    str = "unknown",
+        user_id: str = "unknown",
     ) -> Dict[str, pd.DataFrame]:
         """
         Extract features from all signal channels.
@@ -654,20 +647,20 @@ class FeatureExtractor:
     # ── Internal extraction helpers ──────────────────────────────────
 
     def _extract_windowed(self, df, val_col, sig_name, fn,
-                           session_id, user_id) -> pd.DataFrame:
+                          session_id, user_id) -> pd.DataFrame:
         """Generic windowed feature extraction for single-column signals."""
         if val_col not in df.columns:
             return pd.DataFrame()
-        fs     = float(SAMPLING_RATES.get(sig_name, 4) or 4)
-        win_n  = int(self.window_s * fs)
+        fs = float(SAMPLING_RATES.get(sig_name, 4) or 4)
+        win_n = int(self.window_s * fs)
         step_n = int(win_n * (1 - self.overlap))
-        arr    = df[val_col].values.astype(float)
-        ts     = df["timestamp_s"].values if "timestamp_s" in df.columns else np.arange(len(arr)) / fs
+        arr = df[val_col].values.astype(float)
+        ts = df["timestamp_s"].values if "timestamp_s" in df.columns else np.arange(len(arr)) / fs
 
         has_label = "target_label" in df.columns
         rows = []
         for s, e in _windows(len(arr), win_n, step_n):
-            seg  = arr[s:e]
+            seg = arr[s:e]
             label = None
             if has_label:
                 labels_seg = df["target_label"].iloc[s:e]
@@ -678,11 +671,11 @@ class FeatureExtractor:
             feats = fn(seg, fs, base)
 
             row = {
-                "session_id":    session_id,
-                "user_id":       user_id,
+                "session_id": session_id,
+                "user_id": user_id,
                 "window_start_s": _safe(ts[s]),
-                "window_end_s":   _safe(ts[min(e - 1, len(ts) - 1)]),
-                "target_label":   label if has_label else "unknown",
+                "window_end_s": _safe(ts[min(e - 1, len(ts) - 1)]),
+                "target_label": label if has_label else "unknown",
                 **feats,
             }
             rows.append(row)
@@ -702,11 +695,11 @@ class FeatureExtractor:
         """IBI is event-based — use all values in window."""
         if "IBI_ms" not in df.columns:
             return pd.DataFrame()
-        times  = df["timestamp_s"].values if "timestamp_s" in df.columns else np.arange(len(df))
+        times = df["timestamp_s"].values if "timestamp_s" in df.columns else np.arange(len(df))
         values = df["IBI_ms"].values.astype(float)
         has_label = "target_label" in df.columns
-        dur_s  = times[-1] - times[0] if len(times) > 1 else 0
-        win_s  = self.window_s
+        dur_s = times[-1] - times[0] if len(times) > 1 else 0
+        win_s = self.window_s
         step_s = win_s * (1 - self.overlap)
 
         rows = []
@@ -719,13 +712,13 @@ class FeatureExtractor:
                 label = None
                 if has_label:
                     labels = df["target_label"].values[mask]
-                    label  = pd.Series(labels).mode()[0] if len(labels) > 0 else "unknown"
+                    label = pd.Series(labels).mode()[0] if len(labels) > 0 else "unknown"
                 feats = extract_ibi_features(seg_t, seg_v)
                 rows.append({
                     "session_id": session_id, "user_id": user_id,
                     "window_start_s": _safe(t0),
-                    "window_end_s":   _safe(t0 + win_s),
-                    "target_label":   label if has_label else "unknown",
+                    "window_end_s": _safe(t0 + win_s),
+                    "target_label": label if has_label else "unknown",
                     **feats,
                 })
             t0 += step_s
@@ -736,13 +729,13 @@ class FeatureExtractor:
         """Extract ACC features from 3-axis data."""
         if not all(c in df.columns for c in ("ACC_X_g", "ACC_Y_g", "ACC_Z_g")):
             return pd.DataFrame()
-        fs    = float(SAMPLING_RATES.get("ACC", 32))
+        fs = float(SAMPLING_RATES.get("ACC", 32))
         win_n = int(self.window_s * fs)
-        step_n= int(win_n * (1 - self.overlap))
-        ax    = df["ACC_X_g"].values.astype(float)
-        ay    = df["ACC_Y_g"].values.astype(float)
-        az    = df["ACC_Z_g"].values.astype(float)
-        ts    = df["timestamp_s"].values if "timestamp_s" in df.columns else np.arange(len(ax)) / fs
+        step_n = int(win_n * (1 - self.overlap))
+        ax = df["ACC_X_g"].values.astype(float)
+        ay = df["ACC_Y_g"].values.astype(float)
+        az = df["ACC_Z_g"].values.astype(float)
+        ts = df["timestamp_s"].values if "timestamp_s" in df.columns else np.arange(len(ax)) / fs
         has_label = "target_label" in df.columns
 
         rows = []
@@ -750,13 +743,13 @@ class FeatureExtractor:
             label = None
             if has_label:
                 labels = df["target_label"].iloc[s:e]
-                label  = labels.mode()[0] if len(labels) > 0 else "unknown"
+                label = labels.mode()[0] if len(labels) > 0 else "unknown"
             feats = extract_acc_features(ax[s:e], ay[s:e], az[s:e], fs)
             rows.append({
                 "session_id": session_id, "user_id": user_id,
                 "window_start_s": _safe(ts[s]),
-                "window_end_s":   _safe(ts[min(e - 1, len(ts) - 1)]),
-                "target_label":   label if has_label else "unknown",
+                "window_end_s": _safe(ts[min(e - 1, len(ts) - 1)]),
+                "target_label": label if has_label else "unknown",
                 **feats,
             })
         return pd.DataFrame(rows) if rows else pd.DataFrame()

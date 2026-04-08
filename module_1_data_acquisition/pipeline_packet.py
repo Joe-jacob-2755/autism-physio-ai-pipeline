@@ -40,24 +40,24 @@ import pandas as pd
 # SOURCE TYPE CONSTANTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-SOURCE_IMPORTED   = "imported"
-SOURCE_SIMULATED  = "simulated"
-SOURCE_LIVE       = "live"
+SOURCE_IMPORTED = "imported"
+SOURCE_SIMULATED = "simulated"
+SOURCE_LIVE = "live"
 SOURCE_DEPLOYMENT = "deployment"
 
 VALID_SOURCES = {SOURCE_IMPORTED, SOURCE_SIMULATED, SOURCE_LIVE, SOURCE_DEPLOYMENT}
 
 # Expected signal columns for each channel (value columns only, no metadata)
 SIGNAL_VALUE_COLS: Dict[str, list] = {
-    "EDA":   ["EDA_uS"],
-    "BVP":   ["BVP_nT"],
-    "IBI":   ["IBI_ms"],
-    "ST":    ["ST_degC"],
-    "ACC":   ["ACC_X_g", "ACC_Y_g", "ACC_Z_g"],
+    "EDA": ["EDA_uS"],
+    "BVP": ["BVP_nT"],
+    "IBI": ["IBI_ms"],
+    "ST": ["ST_degC"],
+    "ACC": ["ACC_X_g", "ACC_Y_g", "ACC_Z_g"],
 }
 
 ANNOTATION_COLS = ["target_label", "event_id", "category"]
-REQUIRED_COL    = "timestamp_s"
+REQUIRED_COL = "timestamp_s"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -79,13 +79,13 @@ class PipelinePacket:
     session_id    : unique session string (auto-generated if not supplied)
     user_id       : participant identifier
     """
-    signals:     Dict[str, pd.DataFrame]
-    combined:    pd.DataFrame
-    metadata:    dict
+    signals: Dict[str, pd.DataFrame]
+    combined: pd.DataFrame
+    metadata: dict
     source_type: str
     is_annotated: bool
-    session_id:  str
-    user_id:     str
+    session_id: str
+    user_id: str
 
     # ── Validation ─────────────────────────────────────────────────────────
 
@@ -154,14 +154,14 @@ class PipelinePacket:
 
         meta = dict(self.metadata)
         meta.update({
-            "session_id":   self.session_id,
-            "user_id":      self.user_id,
-            "source_type":  self.source_type,
+            "session_id": self.session_id,
+            "user_id": self.user_id,
+            "source_type": self.source_type,
             "is_annotated": self.is_annotated,
-            "duration_s":   round(self.duration_s, 3),
-            "n_events":     self.n_events,
+            "duration_s": round(self.duration_s, 3),
+            "n_events": self.n_events,
             "unique_labels": self.unique_labels,
-            "saved_at":     datetime.now().isoformat(),
+            "saved_at": datetime.now().isoformat(),
         })
         with open(out / "packet_metadata.json", "w") as fh:
             json.dump(meta, fh, indent=2)
@@ -186,21 +186,21 @@ class PipelinePacket:
             meta = json.load(fh)
 
         return cls(
-            signals      = signals,
-            combined     = combined,
-            metadata     = meta,
-            source_type  = meta.get("source_type", SOURCE_IMPORTED),
-            is_annotated = meta.get("is_annotated", True),
-            session_id   = meta.get("session_id", _new_session_id()),
-            user_id      = meta.get("user_id", "unknown"),
+            signals=signals,
+            combined=combined,
+            metadata=meta,
+            source_type=meta.get("source_type", SOURCE_IMPORTED),
+            is_annotated=meta.get("is_annotated", True),
+            session_id=meta.get("session_id", _new_session_id()),
+            user_id=meta.get("user_id", "unknown"),
         )
 
     # ── Summary ──────────────────────────────────────────────────────────
 
     def summary(self) -> str:
         ann_str = "YES" if self.is_annotated else "NO (deployment mode)"
-        labels  = ", ".join(self.unique_labels) if self.unique_labels else "none"
-        lines   = [
+        labels = ", ".join(self.unique_labels) if self.unique_labels else "none"
+        lines = [
             "=" * 60,
             "  PIPELINE PACKET",
             "=" * 60,
@@ -232,19 +232,19 @@ class PipelinePacket:
 
 def _new_session_id(prefix: str = "SES") -> str:
     """Generate a short unique session ID e.g. SES-20250406-A3F7."""
-    ts   = datetime.now().strftime("%Y%m%d-%H%M%S")
-    uid  = hashlib.md5(ts.encode()).hexdigest()[:4].upper()
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    uid = hashlib.md5(ts.encode()).hexdigest()[:4].upper()
     return f"{prefix}-{ts}-{uid}"
 
 
 def build_packet_from_dataframes(
-    signals:     Dict[str, pd.DataFrame],
-    combined:    pd.DataFrame,
+    signals: Dict[str, pd.DataFrame],
+    combined: pd.DataFrame,
     source_type: str,
     is_annotated: bool,
-    user_id:     str       = "unknown",
-    session_id:  str       = None,
-    extra_meta:  dict      = None,
+    user_id: str = "unknown",
+    session_id: str = None,
+    extra_meta: dict = None,
 ) -> PipelinePacket:
     """
     Convenience builder — construct a PipelinePacket from DataFrames.
@@ -259,7 +259,7 @@ def build_packet_from_dataframes(
     session_id  : if None, one is auto-generated
     extra_meta  : any additional metadata fields
     """
-    sid  = session_id or _new_session_id()
+    sid = session_id or _new_session_id()
     meta = {"source_type": source_type, "user_id": user_id}
     if extra_meta:
         meta.update(extra_meta)
@@ -271,19 +271,19 @@ def build_packet_from_dataframes(
                     if c not in (REQUIRED_COL,) + tuple(ANNOTATION_COLS)]
         for col in val_cols:
             meta["signal_stats"][f"{name}.{col}"] = {
-                "n":    int(len(df)),
+                "n": int(len(df)),
                 "mean": round(float(df[col].mean()), 4),
-                "std":  round(float(df[col].std()),  4),
-                "min":  round(float(df[col].min()),  4),
-                "max":  round(float(df[col].max()),  4),
+                "std": round(float(df[col].std()), 4),
+                "min": round(float(df[col].min()), 4),
+                "max": round(float(df[col].max()), 4),
             }
 
     return PipelinePacket(
-        signals      = signals,
-        combined     = combined,
-        metadata     = meta,
-        source_type  = source_type,
-        is_annotated = is_annotated,
-        session_id   = sid,
-        user_id      = user_id,
+        signals=signals,
+        combined=combined,
+        metadata=meta,
+        source_type=source_type,
+        is_annotated=is_annotated,
+        session_id=sid,
+        user_id=user_id,
     )

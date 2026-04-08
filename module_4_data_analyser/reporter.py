@@ -31,32 +31,32 @@ class AnalysisReporter:
 
     def generate(
         self,
-        session_id:      str,
-        user_id:         str,
-        metadata:        dict,
-        descriptive_df:  pd.DataFrame,
-        kruskal_df:      pd.DataFrame,
-        pairwise_df:     pd.DataFrame,
-        corr_target_df:  pd.DataFrame,
-        corr_matrix_df:  pd.DataFrame,
-        dynamics_df:     pd.DataFrame,
-        return_df:       pd.DataFrame,
-        pct_change_df:   pd.DataFrame,
-        threshold_df:    pd.DataFrame,
-        plot_paths:      Dict[str, Path],
+        session_id: str,
+        user_id: str,
+        metadata: dict,
+        descriptive_df: pd.DataFrame,
+        kruskal_df: pd.DataFrame,
+        pairwise_df: pd.DataFrame,
+        corr_target_df: pd.DataFrame,
+        corr_matrix_df: pd.DataFrame,
+        dynamics_df: pd.DataFrame,
+        return_df: pd.DataFrame,
+        pct_change_df: pd.DataFrame,
+        threshold_df: pd.DataFrame,
+        plot_paths: Dict[str, Path],
     ) -> Path:
         """Write all tables as CSVs and produce the HTML report."""
 
         # ── Save CSV tables ───────────────────────────────────────────────
-        self._save_csv(descriptive_df,  "descriptive_statistics.csv")
-        self._save_csv(kruskal_df,       "kruskal_wallis_results.csv")
-        self._save_csv(pairwise_df,      "pairwise_mannwhitney.csv")
-        self._save_csv(corr_target_df,   "correlation_feature_target.csv")
-        self._save_csv(corr_matrix_df,   "correlation_matrix.csv")
-        self._save_csv(dynamics_df,      "temporal_dynamics.csv")
-        self._save_csv(return_df,        "return_to_median_summary.csv")
-        self._save_csv(pct_change_df,    "pct_change_summary.csv")
-        self._save_csv(threshold_df,     "threshold_events.csv")
+        self._save_csv(descriptive_df, "descriptive_statistics.csv")
+        self._save_csv(kruskal_df, "kruskal_wallis_results.csv")
+        self._save_csv(pairwise_df, "pairwise_mannwhitney.csv")
+        self._save_csv(corr_target_df, "correlation_feature_target.csv")
+        self._save_csv(corr_matrix_df, "correlation_matrix.csv")
+        self._save_csv(dynamics_df, "temporal_dynamics.csv")
+        self._save_csv(return_df, "return_to_median_summary.csv")
+        self._save_csv(pct_change_df, "pct_change_summary.csv")
+        self._save_csv(threshold_df, "threshold_events.csv")
 
         # ── Build HTML ────────────────────────────────────────────────────
         html = self._build_html(
@@ -83,8 +83,8 @@ class AnalysisReporter:
 
         # Key stats
         n_sig_features = int(kw["significant"].sum()) if not kw.empty and "significant" in kw.columns else 0
-        n_thr_events   = len(thr) if not thr.empty else 0
-        top_features   = corr_t.head(5)["feature"].tolist() if not corr_t.empty else []
+        n_thr_events = len(thr) if not thr.empty else 0
+        top_features = corr_t.head(5)["feature"].tolist() if not corr_t.empty else []
 
         def _df_to_html(df, max_rows=20, classes="table"):
             if df is None or (hasattr(df, "empty") and df.empty):
@@ -153,9 +153,9 @@ h3{font-size:14px;font-weight:700;color:#2E7D92;margin-top:20px}
         # Pct change table snippet
         pct_html = _df_to_html(pct.head(15)) if not pct.empty else "<p>No data</p>"
         # Top KW features
-        kw_top   = kw[kw["significant"]].head(10) if not kw.empty and "significant" in kw.columns else pd.DataFrame()
-        kw_html  = _df_to_html(kw_top)
-        corr_html= _df_to_html(corr_t.head(10))
+        kw_top = kw[kw["significant"]].head(10) if not kw.empty and "significant" in kw.columns else pd.DataFrame()
+        kw_html = _df_to_html(kw_top)
+        corr_html = _df_to_html(corr_t.head(10))
         ret_html = _df_to_html(ret)
         dyn_html = _df_to_html(dyn.head(15)) if not dyn.empty else "<p>No data</p>"
         thr_html = _df_to_html(thr) if not thr.empty else "<p>No threshold events detected.</p>"
@@ -163,6 +163,11 @@ h3{font-size:14px;font-weight:700;color:#2E7D92;margin-top:20px}
         # Qualitative insights
         insights = self._generate_insights(desc, kw, corr_t, dyn, ret, pct, thr)
 
+        threshold_imgs = "".join(
+            _img(plots.get(f"threshold_{s}"),
+                 f"{s} with adaptive threshold overlay")
+            for s in ("EDA", "BVP", "ST", "ACC", "IBI")
+        )
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -186,9 +191,9 @@ h3{font-size:14px;font-weight:700;color:#2E7D92;margin-top:20px}
   <h2>Summary</h2>
   <div class="stats-grid">
     <div class="stat-card"><div class="stat-val">{len(targets)}</div><div class="stat-lbl">Target classes</div></div>
-    <div class="stat-card"><div class="stat-val">{n_sig_features}</div><div class="stat-lbl">Significant features (KW)</div></div>
-    <div class="stat-card"><div class="stat-val">{len(dyn) if not dyn.empty else 0}</div><div class="stat-lbl">Events analysed</div></div>
-    <div class="stat-card"><div class="stat-val">{n_thr_events}</div><div class="stat-lbl">Threshold crossings</div></div>
+    <div class="stat-card"><div class="stat-val">{n_sig_features}</div><div class="stat-lbl">Significant features (KW)</div></div>  # noqa: E501
+    <div class="stat-card"><div class="stat-val">{len(dyn) if not dyn.empty else 0}</div><div class="stat-lbl">Events analysed</div></div>  # noqa: E501
+    <div class="stat-card"><div class="stat-val">{n_thr_events}</div><div class="stat-lbl">Threshold crossings</div></div>  # noqa: E501
   </div>
   <p><strong>Target labels in this session:</strong><br>{target_chips}</p>
   <p><strong>Top correlated features:</strong> {", ".join(top_features) or "—"}</p>
@@ -206,11 +211,11 @@ h3{font-size:14px;font-weight:700;color:#2E7D92;margin-top:20px}
   <h3>Signal % Change from Baseline per Target</h3>
   {pct_html}
   {_img(plots.get("pct_change"), "Mean % change from pre-event baseline for each signal and target")}
-  {_img(plots.get("descriptive_EDA"),  "EDA feature distributions per target")}
-  {_img(plots.get("descriptive_BVP"),  "BVP feature distributions per target")}
-  {_img(plots.get("descriptive_IBI"),  "IBI/HRV feature distributions per target")}
-  {_img(plots.get("descriptive_ST"),   "ST feature distributions per target")}
-  {_img(plots.get("descriptive_ACC"),  "ACC feature distributions per target")}
+  {_img(plots.get("descriptive_EDA"), "EDA feature distributions per target")}
+  {_img(plots.get("descriptive_BVP"), "BVP feature distributions per target")}
+  {_img(plots.get("descriptive_IBI"), "IBI/HRV feature distributions per target")}
+  {_img(plots.get("descriptive_ST"), "ST feature distributions per target")}
+  {_img(plots.get("descriptive_ACC"), "ACC feature distributions per target")}
 </div>
 
 <!-- STATISTICAL -->
@@ -226,8 +231,8 @@ h3{font-size:14px;font-weight:700;color:#2E7D92;margin-top:20px}
   <h2>3. Correlation Analysis</h2>
   <h3>Feature–Target Correlation (Spearman ρ)</h3>
   {corr_html}
-  {_img(plots.get("corr_target"),  "Spearman correlation between features and target label")}
-  {_img(plots.get("corr_matrix"),  "Feature–feature correlation matrix (top features by variance)")}
+  {_img(plots.get("corr_target"), "Spearman correlation between features and target label")}
+  {_img(plots.get("corr_matrix"), "Feature–feature correlation matrix (top features by variance)")}
 </div>
 
 <!-- TEMPORAL DYNAMICS -->
@@ -249,7 +254,7 @@ h3{font-size:14px;font-weight:700;color:#2E7D92;margin-top:20px}
   <p>Threshold: signal deviates &gt; {meta.get("mad_factor", 3.0)}×MAD from running median
      for &gt; {meta.get("sustain_s", 30)}s within a {meta.get("window_s", 300)}s window.</p>
   {thr_html}
-  {"".join(_img(plots.get(f"threshold_{s}"), f"{s} with adaptive threshold overlay") for s in ("EDA","BVP","ST","ACC","IBI"))}
+  {threshold_imgs}
 </div>
 
 <!-- 3D VISUALISATION -->
@@ -271,9 +276,9 @@ h3{font-size:14px;font-weight:700;color:#2E7D92;margin-top:20px}
 
         # Significant features
         if not kw.empty and "significant" in kw.columns:
-            n_sig  = kw["significant"].sum()
-            n_tot  = len(kw)
-            top3   = kw[kw["significant"]].head(3)["feature"].tolist() if n_sig > 0 else []
+            n_sig = kw["significant"].sum()
+            n_tot = len(kw)
+            top3 = kw[kw["significant"]].head(3)["feature"].tolist() if n_sig > 0 else []
             insights.append(
                 f"<strong>Statistical discrimination:</strong> {n_sig} of {n_tot} features "
                 f"show significant differences across target states (Kruskal-Wallis, α=0.05). "
@@ -315,7 +320,7 @@ h3{font-size:14px;font-weight:700;color:#2E7D92;margin-top:20px}
                 f"<strong>Fastest signal response:</strong> {fast['signal']} peaks "
                 f"{fast['peak_delay_s']:.1f}s after event onset for "
                 f"<em>{fast['target_label']}</em> — "
-                f"{'consistent with rapid sympathetic activation.' if fast['peak_delay_s'] < 5 else 'reflecting a slower physiological response.'}"
+                f"{'consistent with rapid sympathetic activation.' if fast['peak_delay_s'] < 5 else 'reflecting a slower physiological response.'}"  # noqa: E501
             )
 
         if not insights:

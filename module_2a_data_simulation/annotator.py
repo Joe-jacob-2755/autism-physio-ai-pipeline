@@ -93,12 +93,12 @@ class AutoAnnotator:
     def __init__(
         self,
         duration_s: float,
-        events:     List[EventConfig],
-        signals:    Dict[str, np.ndarray],
+        events: List[EventConfig],
+        signals: Dict[str, np.ndarray],
     ):
         self.duration_s = duration_s
-        self.events     = events
-        self.signals    = signals
+        self.events = events
+        self.signals = signals
 
     # ── Master method ───────────────────────────────────────────────────────
 
@@ -115,16 +115,16 @@ class AutoAnnotator:
           'sample_labels' : per-sample label DataFrame (one column per signal)
         }
         """
-        event_df   = self._build_event_annotations()
+        event_df = self._build_event_annotations()
         baseline_df = self._build_baseline_windows(event_df)
-        sqi_df     = self._build_sqi_table()
-        sample_df  = self._build_sample_labels()
+        sqi_df = self._build_sqi_table()
+        sample_df = self._build_sample_labels()
 
         return {
-            "events":         event_df,
-            "baseline_wins":  baseline_df,
+            "events": event_df,
+            "baseline_wins": baseline_df,
             "signal_quality": sqi_df,
-            "sample_labels":  sample_df,
+            "sample_labels": sample_df,
         }
 
     # ── Event annotation DataFrame ─────────────────────────────────────────
@@ -133,21 +133,21 @@ class AutoAnnotator:
         rows = []
         for i, ev in enumerate(self.events):
             row = {
-                "event_id":       i + 1,
-                "emotion":        ev.emotion,
-                "category":       ev.profile["category"],
-                "valence":        ev.profile.get("valence", "unknown"),
-                "arousal":        ev.profile.get("arousal", "unknown"),
-                "start_s":        round(ev.start_s, 3),
-                "end_s":          round(ev.end_s,   3),
-                "duration_s":     round(ev.duration_s, 3),
-                "color_hex":      ev.color,
-                "description":    ev.profile["description"],
+                "event_id": i + 1,
+                "emotion": ev.emotion,
+                "category": ev.profile["category"],
+                "valence": ev.profile.get("valence", "unknown"),
+                "arousal": ev.profile.get("arousal", "unknown"),
+                "start_s": round(ev.start_s, 3),
+                "end_s": round(ev.end_s, 3),
+                "duration_s": round(ev.duration_s, 3),
+                "color_hex": ev.color,
+                "description": ev.profile["description"],
                 # Expected signal directions (for validation reference)
-                "expect_EDA_dir":  "up"   if ev.profile["EDA"]["tonic_delta"] > 0 else "down",
-                "expect_HR_dir":   "up"   if ev.profile["BVP"]["hr_delta_bpm"] > 0 else "down",
-                "expect_ST_dir":   "up"   if ev.profile["ST"]["delta_celsius"] > 0 else "down",
-                "expect_ACC_dir":  "high" if ev.profile["ACC"]["activity_amp"] > 0.5 else "low",
+                "expect_EDA_dir": "up" if ev.profile["EDA"]["tonic_delta"] > 0 else "down",
+                "expect_HR_dir": "up" if ev.profile["BVP"]["hr_delta_bpm"] > 0 else "down",
+                "expect_ST_dir": "up" if ev.profile["ST"]["delta_celsius"] > 0 else "down",
+                "expect_ACC_dir": "high" if ev.profile["ACC"]["activity_amp"] > 0.5 else "low",
             }
             rows.append(row)
 
@@ -166,18 +166,18 @@ class AutoAnnotator:
             key=lambda x: x[0],
         )
 
-        gaps    = []
-        cursor  = 0.0
-        win_id  = 1
+        gaps = []
+        cursor = 0.0
+        win_id = 1
 
         for (ev_start, ev_end) in occupied:
             if ev_start - cursor >= 5.0:
                 gaps.append({
-                    "baseline_id":  win_id,
-                    "start_s":      round(cursor, 3),
-                    "end_s":        round(ev_start, 3),
-                    "duration_s":   round(ev_start - cursor, 3),
-                    "label":        "baseline",
+                    "baseline_id": win_id,
+                    "start_s": round(cursor, 3),
+                    "end_s": round(ev_start, 3),
+                    "duration_s": round(ev_start - cursor, 3),
+                    "label": "baseline",
                 })
                 win_id += 1
             cursor = ev_end
@@ -185,11 +185,11 @@ class AutoAnnotator:
         # Tail gap
         if self.duration_s - cursor >= 5.0:
             gaps.append({
-                "baseline_id":  win_id,
-                "start_s":      round(cursor, 3),
-                "end_s":        round(self.duration_s, 3),
-                "duration_s":   round(self.duration_s - cursor, 3),
-                "label":        "baseline",
+                "baseline_id": win_id,
+                "start_s": round(cursor, 3),
+                "end_s": round(self.duration_s, 3),
+                "duration_s": round(self.duration_s - cursor, 3),
+                "label": "baseline",
             })
 
         return pd.DataFrame(gaps)
@@ -203,14 +203,14 @@ class AutoAnnotator:
             if sig_name in ("IBI_TIMES", "IBI_VALUES"):
                 continue
             fs_key = sig_name if sig_name in SAMPLING_RATES else "EDA"
-            fs     = SAMPLING_RATES.get(fs_key, 4)
-            win_n  = int(window_s * fs)
-            n      = len(sig_arr)
+            fs = SAMPLING_RATES.get(fs_key, 4)
+            win_n = int(window_s * fs)
+            n = len(sig_arr)
 
             for start_idx in range(0, n - win_n + 1, win_n):
-                seg      = sig_arr[start_idx: start_idx + win_n]
-                t_start  = start_idx / fs
-                sqi      = compute_sqi(seg, sig_name, fs)
+                seg = sig_arr[start_idx: start_idx + win_n]
+                t_start = start_idx / fs
+                sqi = compute_sqi(seg, sig_name, fs)
 
                 # Find which event (if any) this window falls in
                 label = "baseline"
@@ -220,11 +220,11 @@ class AutoAnnotator:
                         break
 
                 rows.append({
-                    "signal":       sig_name,
+                    "signal": sig_name,
                     "window_start_s": round(t_start, 2),
-                    "window_end_s":   round(t_start + window_s, 2),
-                    "sqi":           round(sqi, 4),
-                    "state_label":   label,
+                    "window_end_s": round(t_start + window_s, 2),
+                    "sqi": round(sqi, 4),
+                    "state_label": label,
                 })
 
         return pd.DataFrame(rows)
@@ -239,23 +239,23 @@ class AutoAnnotator:
         Columns: time_s, label, event_id, category
         """
         fs_ref = SAMPLING_RATES["BVP"]
-        n_ref  = int(self.duration_s * fs_ref)
-        t_ref  = np.arange(n_ref) / fs_ref
+        n_ref = int(self.duration_s * fs_ref)
+        t_ref = np.arange(n_ref) / fs_ref
 
-        labels    = np.full(n_ref, "baseline", dtype=object)
+        labels = np.full(n_ref, "baseline", dtype=object)
         event_ids = np.full(n_ref, 0, dtype=int)
-        cats      = np.full(n_ref, "baseline", dtype=object)
+        cats = np.full(n_ref, "baseline", dtype=object)
 
         for ev in self.events:
-            i0 = int(ev.start_s   * fs_ref)
-            i1 = int(ev.end_s     * fs_ref)
-            labels[i0:i1]    = ev.emotion
+            i0 = int(ev.start_s * fs_ref)
+            i1 = int(ev.end_s * fs_ref)
+            labels[i0:i1] = ev.emotion
             event_ids[i0:i1] = self.events.index(ev) + 1
-            cats[i0:i1]      = ev.profile["category"]
+            cats[i0:i1] = ev.profile["category"]
 
         return pd.DataFrame({
-            "time_s":   np.round(t_ref, 4),
-            "label":    labels,
+            "time_s": np.round(t_ref, 4),
+            "label": labels,
             "event_id": event_ids,
             "category": cats,
         })

@@ -57,11 +57,11 @@ from pipeline_packet import (
 # ─────────────────────────────────────────────────────────────────────────────
 
 SIGNAL_FILES = {
-    "EDA": {"file": "EDA.csv",  "value_cols": ["EDA_uS"]},
-    "BVP": {"file": "BVP.csv",  "value_cols": ["BVP_nT"]},
-    "IBI": {"file": "IBI.csv",  "value_cols": ["IBI_ms"]},
-    "ST":  {"file": "ST.csv",   "value_cols": ["ST_degC"]},
-    "ACC": {"file": "ACC.csv",  "value_cols": ["ACC_X_g", "ACC_Y_g", "ACC_Z_g"]},
+    "EDA": {"file": "EDA.csv", "value_cols": ["EDA_uS"]},
+    "BVP": {"file": "BVP.csv", "value_cols": ["BVP_nT"]},
+    "IBI": {"file": "IBI.csv", "value_cols": ["IBI_ms"]},
+    "ST": {"file": "ST.csv", "value_cols": ["ST_degC"]},
+    "ACC": {"file": "ACC.csv", "value_cols": ["ACC_X_g", "ACC_Y_g", "ACC_Z_g"]},
 }
 
 COMBINED_FILE = "combined_signals.csv"
@@ -87,14 +87,14 @@ class DataImporter:
     def __init__(
         self,
         source_path: str | Path,
-        user_id:     str           = "imported_user",
-        session_id:  Optional[str] = None,
-        verbose:     bool          = True,
+        user_id: str = "imported_user",
+        session_id: Optional[str] = None,
+        verbose: bool = True,
     ):
         self.source_path = Path(source_path)
-        self.user_id     = user_id
-        self.session_id  = session_id or _new_session_id("IMP")
-        self.verbose     = verbose
+        self.user_id = user_id
+        self.session_id = session_id or _new_session_id("IMP")
+        self.verbose = verbose
 
     # ── Public API ─────────────────────────────────────────────────────────
 
@@ -127,13 +127,13 @@ class DataImporter:
             uid = extra_meta.get("user_id", self.user_id)
 
         packet = build_packet_from_dataframes(
-            signals      = signals,
-            combined     = combined,
-            source_type  = SOURCE_IMPORTED,
-            is_annotated = is_annotated,
-            user_id      = uid,
-            session_id   = self.session_id,
-            extra_meta   = {
+            signals=signals,
+            combined=combined,
+            source_type=SOURCE_IMPORTED,
+            is_annotated=is_annotated,
+            user_id=uid,
+            session_id=self.session_id,
+            extra_meta={
                 "source_path": str(self.source_path),
                 **extra_meta,
             },
@@ -147,7 +147,7 @@ class DataImporter:
 
     def _load_folder(self, folder: Path):
         """Auto-detect folder layout and load accordingly."""
-        found_signals  = {}
+        found_signals = {}
         found_combined = None
 
         # Try loading each known signal file
@@ -198,7 +198,7 @@ class DataImporter:
     # ── Validation ─────────────────────────────────────────────────────────
 
     def _validate_signal_df(self, df: pd.DataFrame, name: str,
-                             value_cols: list) -> bool:
+                            value_cols: list) -> bool:
         if REQUIRED_COL not in df.columns:
             self._log(f"  WARNING: {name}.csv missing '{REQUIRED_COL}' — skipped")
             return False
@@ -222,14 +222,14 @@ class DataImporter:
     def _split_combined(self, combined: pd.DataFrame) -> dict:
         """Extract per-signal DataFrames from a combined signals DataFrame."""
         signals = {}
-        ts_col  = combined["timestamp_s"] if "timestamp_s" in combined.columns else None
+        ts_col = combined["timestamp_s"] if "timestamp_s" in combined.columns else None
         ann_cols = [c for c in ANNOTATION_COLS if c in combined.columns]
 
         col_map = {
             "EDA": ["EDA_uS"],
             "BVP": ["BVP_nT"],
             "IBI": ["IBI_ms"],
-            "ST":  ["ST_degC"],
+            "ST": ["ST_degC"],
             "ACC": ["ACC_X_g", "ACC_Y_g", "ACC_Z_g"],
         }
 
@@ -256,7 +256,7 @@ class DataImporter:
 
         # Use the longest signal as reference time grid
         ref_sig = max(signals.items(), key=lambda x: len(x[1]))[1]
-        t_ref   = ref_sig["timestamp_s"].values
+        t_ref = ref_sig["timestamp_s"].values
 
         combined = pd.DataFrame({"timestamp_s": t_ref})
 
@@ -275,8 +275,8 @@ class DataImporter:
         for sig_name, col in col_map.items():
             if sig_name not in signals:
                 continue
-            df  = signals[sig_name]
-            ts  = df["timestamp_s"].values
+            df = signals[sig_name]
+            ts = df["timestamp_s"].values
             val = df[col].values
             if len(ts) == len(t_ref):
                 combined[col] = val
@@ -321,8 +321,8 @@ class DataImporter:
 
 def import_data(
     source_path: str | Path,
-    user_id:     str  = "imported_user",
-    verbose:     bool = True,
+    user_id: str = "imported_user",
+    verbose: bool = True,
 ) -> PipelinePacket:
     """
     Shorthand: import data from a folder or CSV file.

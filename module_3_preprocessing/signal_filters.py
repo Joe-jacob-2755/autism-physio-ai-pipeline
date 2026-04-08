@@ -41,10 +41,10 @@ from config import FILTER_DEFAULTS, KALMAN_DEFAULTS, SAMPLING_RATES
 # ─────────────────────────────────────────────────────────────────────────────
 
 def butterworth_lowpass(
-    sig:      np.ndarray,
-    fs:       float,
-    cutoff:   float,
-    order:    int = 4,
+    sig: np.ndarray,
+    fs: float,
+    cutoff: float,
+    order: int = 4,
 ) -> np.ndarray:
     """
     Zero-phase Butterworth low-pass filter.
@@ -60,17 +60,17 @@ def butterworth_lowpass(
     order  : filter order (4 gives 80 dB/decade roll-off)
     """
     nyq = fs / 2.0
-    wn  = np.clip(cutoff / nyq, 1e-4, 0.9999)
+    wn = np.clip(cutoff / nyq, 1e-4, 0.9999)
     b, a = sp_signal.butter(order, wn, btype="low")
     return sp_signal.filtfilt(b, a, sig, padlen=min(3 * max(len(b), len(a)), len(sig) - 1))
 
 
 def butterworth_bandpass(
-    sig:     np.ndarray,
-    fs:      float,
-    lowcut:  float,
+    sig: np.ndarray,
+    fs: float,
+    lowcut: float,
     highcut: float,
-    order:   int = 4,
+    order: int = 4,
 ) -> np.ndarray:
     """
     Zero-phase Butterworth band-pass filter.
@@ -84,8 +84,8 @@ def butterworth_bandpass(
     order   : filter order
     """
     nyq = fs / 2.0
-    lo  = np.clip(lowcut  / nyq, 1e-4, 0.9999)
-    hi  = np.clip(highcut / nyq, 1e-4, 0.9999)
+    lo = np.clip(lowcut / nyq, 1e-4, 0.9999)
+    hi = np.clip(highcut / nyq, 1e-4, 0.9999)
     if lo >= hi:
         raise ValueError(f"lowcut ({lowcut}) must be < highcut ({highcut})")
     b, a = sp_signal.butter(order, [lo, hi], btype="band")
@@ -93,14 +93,14 @@ def butterworth_bandpass(
 
 
 def butterworth_highpass(
-    sig:    np.ndarray,
-    fs:     float,
+    sig: np.ndarray,
+    fs: float,
     cutoff: float,
-    order:  int = 4,
+    order: int = 4,
 ) -> np.ndarray:
     """Zero-phase Butterworth high-pass filter."""
     nyq = fs / 2.0
-    wn  = np.clip(cutoff / nyq, 1e-4, 0.9999)
+    wn = np.clip(cutoff / nyq, 1e-4, 0.9999)
     b, a = sp_signal.butter(order, wn, btype="high")
     return sp_signal.filtfilt(b, a, sig, padlen=min(3 * max(len(b), len(a)), len(sig) - 1))
 
@@ -110,9 +110,9 @@ def butterworth_highpass(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def hampel_filter(
-    sig:    np.ndarray,
-    window: int   = 7,
-    sigma:  float = 3.0,
+    sig: np.ndarray,
+    window: int = 7,
+    sigma: float = 3.0,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Hampel identifier: detect and replace impulsive outliers using a
@@ -140,11 +140,11 @@ def hampel_filter(
     filtered_sig : outlier-replaced signal
     outlier_mask : boolean array True where outliers were detected
     """
-    n       = len(sig)
-    out     = sig.copy().astype(float)
-    mask    = np.zeros(n, dtype=bool)
-    k       = window // 2
-    SCALE   = 1.4826   # MAD → sigma scaling constant
+    n = len(sig)
+    out = sig.copy().astype(float)
+    mask = np.zeros(n, dtype=bool)
+    k = window // 2
+    SCALE = 1.4826   # MAD → sigma scaling constant
 
     for i in range(n):
         lo = max(0, i - k)
@@ -154,12 +154,12 @@ def hampel_filter(
         if len(window_vals) < 3:
             continue
 
-        med     = np.median(window_vals)
-        mad     = np.median(np.abs(window_vals - med))
+        med = np.median(window_vals)
+        mad = np.median(np.abs(window_vals - med))
         local_s = SCALE * mad
 
         if local_s > 0 and abs(sig[i] - med) > sigma * local_s:
-            out[i]  = med
+            out[i] = med
             mask[i] = True
 
     return out, mask
@@ -170,9 +170,9 @@ def hampel_filter(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def kalman_filter_1d(
-    sig:               np.ndarray,
+    sig: np.ndarray,
     observation_noise: float = 1.0,
-    process_noise:     float = 0.1,
+    process_noise: float = 0.1,
 ) -> np.ndarray:
     """
     1D Kalman filter / smoother for a scalar time series.
@@ -202,16 +202,16 @@ def kalman_filter_1d(
     both the signal dynamics and sensor noise are approximately Gaussian,
     making Kalman the preferred smoother over fixed-window averages.
     """
-    n    = len(sig)
-    Q    = float(process_noise)
-    R    = float(observation_noise)
+    n = len(sig)
+    Q = float(process_noise)
+    R = float(observation_noise)
 
     # ── Forward pass: Kalman filter ────────────────────────────────────
     x_pred = np.zeros(n)
     P_pred = np.zeros(n)
-    x_upd  = np.zeros(n)
-    P_upd  = np.zeros(n)
-    K      = np.zeros(n)
+    x_upd = np.zeros(n)
+    P_upd = np.zeros(n)
+    K = np.zeros(n)
 
     # Initialise
     x_upd[0] = sig[0]
@@ -223,9 +223,9 @@ def kalman_filter_1d(
         P_pred[t] = P_upd[t - 1] + Q
 
         # Update (Kalman gain)
-        K[t]      = P_pred[t] / (P_pred[t] + R)
-        x_upd[t]  = x_pred[t] + K[t] * (sig[t] - x_pred[t])
-        P_upd[t]  = (1 - K[t]) * P_pred[t]
+        K[t] = P_pred[t] / (P_pred[t] + R)
+        x_upd[t] = x_pred[t] + K[t] * (sig[t] - x_pred[t])
+        P_upd[t] = (1 - K[t]) * P_pred[t]
 
     # ── Backward pass: RTS smoother ─────────────────────────────────
     x_smooth = x_upd.copy()
@@ -233,9 +233,9 @@ def kalman_filter_1d(
 
     for t in range(n - 2, -1, -1):
         if P_pred[t + 1] > 0:
-            G          = P_upd[t] / P_pred[t + 1]
-            x_smooth[t]= x_upd[t] + G * (x_smooth[t + 1] - x_pred[t + 1])
-            P_smooth[t]= P_upd[t] + G ** 2 * (P_smooth[t + 1] - P_pred[t + 1])
+            G = P_upd[t] / P_pred[t + 1]
+            x_smooth[t] = x_upd[t] + G * (x_smooth[t + 1] - x_pred[t + 1])
+            P_smooth[t] = P_upd[t] + G ** 2 * (P_smooth[t + 1] - P_pred[t + 1])
 
     return x_smooth
 
@@ -261,15 +261,15 @@ class SignalFilterManager:
 
     def __init__(
         self,
-        filter_type:      str  = "butterworth",
-        apply_hampel:     bool = True,
+        filter_type: str = "butterworth",
+        apply_hampel: bool = True,
         signal_overrides: dict = None,
-        verbose:          bool = True,
+        verbose: bool = True,
     ):
-        self.filter_type      = filter_type
-        self.apply_hampel     = apply_hampel
+        self.filter_type = filter_type
+        self.apply_hampel = apply_hampel
         self.signal_overrides = signal_overrides or {}
-        self.verbose          = verbose
+        self.verbose = verbose
 
     # ── Public API ─────────────────────────────────────────────────────────
 
@@ -296,10 +296,10 @@ class SignalFilterManager:
         self, df: pd.DataFrame, signal_name: str
     ) -> pd.DataFrame:
         """Apply filter pipeline to a single signal DataFrame."""
-        df_out  = df.copy()
-        params  = {**FILTER_DEFAULTS.get(signal_name, {}),
-                   **self.signal_overrides.get(signal_name, {})}
-        fs      = SAMPLING_RATES.get(signal_name, 4) or 4.0
+        df_out = df.copy()
+        params = {**FILTER_DEFAULTS.get(signal_name, {}),
+                  **self.signal_overrides.get(signal_name, {})}
+        fs = SAMPLING_RATES.get(signal_name, 4) or 4.0
 
         val_cols = [c for c in df_out.columns
                     if c not in ("timestamp_s", "target_label",
@@ -315,8 +315,8 @@ class SignalFilterManager:
             # ── Stage 1: Hampel outlier removal ──────────────────────
             n_outliers = 0
             if self.apply_hampel:
-                h_win   = params.get("hampel_window", 7)
-                h_sigma = params.get("hampel_sigma",  3.0)
+                h_win = params.get("hampel_window", 7)
+                h_sigma = params.get("hampel_sigma", 3.0)
                 arr, mask = hampel_filter(arr, window=h_win, sigma=h_sigma)
                 n_outliers = int(mask.sum())
 
@@ -331,7 +331,7 @@ class SignalFilterManager:
                     elif ftype == "bandpass":
                         arr = butterworth_bandpass(
                             arr, fs,
-                            params.get("lowcut_hz",  0.5),
+                            params.get("lowcut_hz", 0.5),
                             params.get("highcut_hz", 8.0),
                             params.get("order", 4),
                         )
@@ -344,9 +344,9 @@ class SignalFilterManager:
                               f"Butterworth failed ({e}) — skipping")
 
             elif self.filter_type == "kalman":
-                kp  = KALMAN_DEFAULTS.get(signal_name, {})
-                R   = kp.get("observation_noise", 1.0)
-                Q   = kp.get("process_noise", 0.1)
+                kp = KALMAN_DEFAULTS.get(signal_name, {})
+                R = kp.get("observation_noise", 1.0)
+                Q = kp.get("process_noise", 0.1)
                 arr = kalman_filter_1d(arr, observation_noise=R,
                                        process_noise=Q)
 

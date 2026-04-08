@@ -16,6 +16,10 @@ Or directly:
 """
 
 from __future__ import annotations
+from acquisition_module import (
+    DataAcquisitionModule, MODULE_VERSION,
+    MODE_IMPORT, MODE_SIMULATE, MODE_LIVE, MODE_DEPLOYMENT,
+)
 import os
 import sys
 import time
@@ -24,16 +28,11 @@ from pathlib import Path
 from typing import Optional
 
 # ── Ensure module directory is on sys.path ────────────────────────────────────
-MODULE_DIR    = Path(__file__).resolve().parent
-REPO_ROOT     = MODULE_DIR.parent
-M1A_DIR       = REPO_ROOT / "module_2a_data_simulation"
+MODULE_DIR = Path(__file__).resolve().parent
+REPO_ROOT = MODULE_DIR.parent
+M1A_DIR = REPO_ROOT / "module_2a_data_simulation"
 sys.path.insert(0, str(MODULE_DIR))
 sys.path.insert(0, str(M1A_DIR))
-
-from acquisition_module import (
-    DataAcquisitionModule, MODULE_VERSION,
-    MODE_IMPORT, MODE_SIMULATE, MODE_LIVE, MODE_DEPLOYMENT,
-)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -42,8 +41,10 @@ from acquisition_module import (
 
 WIDTH = 64
 
+
 def _line(char="─"):
     print(char * WIDTH)
+
 
 def _header(title: str):
     print()
@@ -51,17 +52,20 @@ def _header(title: str):
     print(f"  {title}")
     print("═" * WIDTH)
 
+
 def _section(title: str):
     print()
     print("  " + "─" * (WIDTH - 4))
     print(f"  {title}")
     print("  " + "─" * (WIDTH - 4))
 
+
 def _ask(prompt: str, default: str = "") -> str:
     """Prompt user and return input, falling back to default on empty."""
     suffix = f" [{default}]" if default != "" else ""
     raw = input(f"\n  {prompt}{suffix}: ").strip()
     return raw if raw else str(default)
+
 
 def _ask_int(prompt: str, default: int, min_val: int = 1,
              max_val: int = 9999) -> int:
@@ -75,6 +79,7 @@ def _ask_int(prompt: str, default: int, min_val: int = 1,
         except ValueError:
             print("  ✗  Please enter a whole number.")
 
+
 def _ask_float(prompt: str, default: float, min_val: float = 0.0) -> float:
     while True:
         raw = _ask(prompt, str(default))
@@ -86,20 +91,24 @@ def _ask_float(prompt: str, default: float, min_val: float = 0.0) -> float:
         except ValueError:
             print("  ✗  Please enter a number.")
 
+
 def _ask_int_or_random(prompt: str, default) -> object:
     raw = _ask(f"{prompt}  (number or 'random')", str(default))
     return "random" if raw.lower() == "random" else int(raw)
+
 
 def _ask_float_or_random(prompt: str, default) -> object:
     raw = _ask(f"{prompt}  (number or 'random')", str(default))
     return "random" if raw.lower() == "random" else float(raw)
 
+
 def _ask_yn(prompt: str, default: bool = False) -> bool:
-    hint  = "Y/n" if default else "y/N"
-    raw   = _ask(f"{prompt}  ({hint})", "")
+    hint = "Y/n" if default else "y/N"
+    raw = _ask(f"{prompt}  ({hint})", "")
     if raw == "":
         return default
     return raw.lower() in ("y", "yes")
+
 
 def _choose(prompt: str, options: list, labels: list = None) -> int:
     """
@@ -121,8 +130,10 @@ def _choose(prompt: str, options: list, labels: list = None) -> int:
         except ValueError:
             print("  ✗  Please enter a number.")
 
+
 def _clear():
     os.system("cls" if os.name == "nt" else "clear")
+
 
 def _pause():
     input("\n  Press Enter to continue ...")
@@ -299,7 +310,7 @@ def _run_simulate_flow(acq: DataAcquisitionModule):
   Typical research session: 300–600 s (5–10 min)
 """)
     duration_s = _ask_float("Duration per user (seconds)", default=300.0,
-                             min_val=30.0)
+                            min_val=30.0)
 
     # ── Number of events ──────────────────────────────────────────────────
     _section("📍  How many emotion / behaviour events?")
@@ -341,11 +352,11 @@ def _run_simulate_flow(acq: DataAcquisitionModule):
         from config import EMOTIONS_ALL, EMOTIONS_AFFECTIVE, EMOTIONS_NEEDS
     except ImportError:
         EMOTIONS_ALL = [
-            "Happy","Anger","Fear","Disgust","Sad","Surprise",
-            "Hunger","Thirst","Toilet","Tired",
+            "Happy", "Anger", "Fear", "Disgust", "Sad", "Surprise",
+            "Hunger", "Thirst", "Toilet", "Tired",
         ]
-        EMOTIONS_AFFECTIVE = ["Happy","Anger","Fear","Disgust","Sad","Surprise"]
-        EMOTIONS_NEEDS     = ["Hunger","Thirst","Toilet","Tired"]
+        EMOTIONS_AFFECTIVE = ["Happy", "Anger", "Fear", "Disgust", "Sad", "Surprise"]
+        EMOTIONS_NEEDS = ["Hunger", "Thirst", "Toilet", "Tired"]
 
     if emotion_choice == 1:
         # Single emotion
@@ -381,10 +392,10 @@ def _run_simulate_flow(acq: DataAcquisitionModule):
   High   — poor electrode contact, movement artefacts
 """)
     noise_idx = _choose("Noise level",
-                         ["low", "medium", "high"],
-                         ["Low    – clean signal",
-                          "Medium – realistic (recommended)",
-                          "High   – noisy, poor contact"])
+                        ["low", "medium", "high"],
+                        ["Low    – clean signal",
+                         "Medium – realistic (recommended)",
+                         "High   – noisy, poor contact"])
     noise_level = ["low", "medium", "high"][noise_idx]
 
     # ── Shared events (multi-user only) ───────────────────────────────────
@@ -431,7 +442,7 @@ def _run_simulate_flow(acq: DataAcquisitionModule):
     _section("✅  Simulation Parameters Summary")
     print(f"""
   Users           : {n_users}
-  Duration/user   : {duration_s:.0f} s  ({duration_s/60:.1f} min)
+  Duration/user   : {duration_s:.0f} s  ({duration_s / 60:.1f} min)
   Events/user     : {n_events}
   Event duration  : {event_dur} s
   Emotions        : {emotions if emotions else 'random (all 10 states)'}
@@ -447,15 +458,15 @@ def _run_simulate_flow(acq: DataAcquisitionModule):
 
     print()
     acq.run_simulate(
-        duration_s       = duration_s,
-        n_events         = n_events,
-        event_duration_s = event_dur,
-        emotions         = emotions,
-        noise_level      = noise_level,
-        seed             = seed,
-        n_users          = n_users,
-        shared_events    = shared_events,
-        save_m1a_output  = save_m1a,
+        duration_s=duration_s,
+        n_events=n_events,
+        event_duration_s=event_dur,
+        emotions=emotions,
+        noise_level=noise_level,
+        seed=seed,
+        n_users=n_users,
+        shared_events=shared_events,
+        save_m1a_output=save_m1a,
     )
 
 
@@ -502,7 +513,7 @@ def _run_live_flow(acq: DataAcquisitionModule):
             csv_path = combined
 
         speed = _ask_float("Replay speed multiplier  (1=realtime, 10=10× faster)",
-                            default=10.0, min_val=0.1)
+                           default=10.0, min_val=0.1)
         acq.run_live_file(csv_path=csv_path, user_id=user_id,
                           speed_factor=speed, max_duration_s=max_dur)
 
@@ -592,10 +603,10 @@ def main():
             break
 
         acq = DataAcquisitionModule(
-            mode         = [MODE_IMPORT, MODE_SIMULATE, MODE_LIVE,
-                            MODE_DEPLOYMENT][choice],
-            save_packets = True,
-            verbose      = True,
+            mode=[MODE_IMPORT, MODE_SIMULATE, MODE_LIVE,
+                  MODE_DEPLOYMENT][choice],
+            save_packets=True,
+            verbose=True,
         )
 
         try:

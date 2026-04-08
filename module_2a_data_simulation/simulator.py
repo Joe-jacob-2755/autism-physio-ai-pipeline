@@ -5,8 +5,8 @@ MODULE 1A – DATA SIMULATION  |  simulator.py
 Master simulation orchestrator.
 
 Now supports per-user physiological profiles via UserProfile. When a
-UserProfile is supplied, the user's personal baseline parameters and
-reactivity factors modulate every signal channel.
+UserProfile is supplied, the user's personal baseline parameters
+and reactivity factors modulate every signal channel.
 
 =============================================================================
 """
@@ -43,15 +43,15 @@ from user_profiles import UserProfile
 @dataclass
 class SimulationResult:
     """Complete output of one simulation run for one user."""
-    signals:       Dict[str, np.ndarray]
-    time_vectors:  Dict[str, np.ndarray]
-    ibi_times_s:   np.ndarray
+    signals: Dict[str, np.ndarray]
+    time_vectors: Dict[str, np.ndarray]
+    ibi_times_s: np.ndarray
     ibi_values_ms: np.ndarray
-    events:        List[EventConfig]
-    annotations:   Dict[str, pd.DataFrame]
-    metadata:      dict
-    duration_s:    float
-    user_profile:  Optional[UserProfile] = None
+    events: List[EventConfig]
+    annotations: Dict[str, pd.DataFrame]
+    metadata: dict
+    duration_s: float
+    user_profile: Optional[UserProfile] = None
 
     def summary(self) -> str:
         uid = (f"  User          : {self.user_profile.user_id} "
@@ -61,9 +61,9 @@ class SimulationResult:
             "=" * 60,
             " MODULE 1A – SIMULATION RESULT SUMMARY",
             "=" * 60,
-            uid +
-            f"  Duration       : {self.duration_s:.1f} s  "
-            f"({self.duration_s/60:.2f} min)",
+            uid
+            + f"  Duration       : {self.duration_s:.1f} s  "
+            f"({self.duration_s / 60:.2f} min)",
             f"  Events         : {len(self.events)}",
             f"  Noise level    : {self.metadata.get('noise_level', 'N/A')}",
             f"  Random seed    : {self.metadata.get('seed', 'N/A')}",
@@ -111,25 +111,25 @@ class DataSimulator:
 
     def __init__(
         self,
-        duration_s:       float                         = DEFAULT_DURATION_S,
-        n_events:         Union[int, str]               = 5,
-        event_duration_s: Union[float, str]             = 30.0,
-        emotions:         Optional[Union[str, list]]    = None,
-        noise_level:      str                           = DEFAULT_NOISE_LEVEL,
-        seed:             Optional[int]                 = DEFAULT_SEED,
-        user_profile:     Optional[UserProfile]         = None,
-        min_gap_s:        float                         = 15.0,
-        min_lead_s:       float                         = 10.0,
+        duration_s: float = DEFAULT_DURATION_S,
+        n_events: Union[int, str] = 5,
+        event_duration_s: Union[float, str] = 30.0,
+        emotions: Optional[Union[str, list]] = None,
+        noise_level: str = DEFAULT_NOISE_LEVEL,
+        seed: Optional[int] = DEFAULT_SEED,
+        user_profile: Optional[UserProfile] = None,
+        min_gap_s: float = 15.0,
+        min_lead_s: float = 10.0,
     ):
-        self.duration_s       = float(duration_s)
-        self.n_events         = n_events
+        self.duration_s = float(duration_s)
+        self.n_events = n_events
         self.event_duration_s = event_duration_s
-        self.emotions         = emotions
-        self.noise_level      = noise_level
-        self.seed             = seed
-        self.user_profile     = user_profile
-        self.min_gap_s        = min_gap_s
-        self.min_lead_s       = min_lead_s
+        self.emotions = emotions
+        self.noise_level = noise_level
+        self.seed = seed
+        self.user_profile = user_profile
+        self.min_gap_s = min_gap_s
+        self.min_lead_s = min_lead_s
 
         # User seed overrides run seed for baseline generation,
         # keeping baselines stable across runs for the same user
@@ -170,28 +170,28 @@ class DataSimulator:
         time_vectors = self._build_time_vectors(final)
 
         metadata = {
-            "duration_s":       self.duration_s,
-            "n_events":         len(events),
-            "noise_level":      self.noise_level,
-            "seed":             self.seed,
-            "emotion_mode":     self._describe_emotion_mode(),
+            "duration_s": self.duration_s,
+            "n_events": len(events),
+            "noise_level": self.noise_level,
+            "seed": self.seed,
+            "emotion_mode": self._describe_emotion_mode(),
             "event_duration_s": self.event_duration_s,
-            "elapsed_s":        round(elapsed, 3),
+            "elapsed_s": round(elapsed, 3),
         }
         if self.user_profile:
             metadata["user"] = self.user_profile.to_dict()
 
         return SimulationResult(
-            signals       = {k: v for k, v in final.items()
-                             if k not in ("IBI_TIMES", "IBI_VALUES")},
-            time_vectors  = time_vectors,
-            ibi_times_s   = final["IBI_TIMES"],
-            ibi_values_ms = final["IBI_VALUES"],
-            events        = events,
-            annotations   = annotations,
-            metadata      = metadata,
-            duration_s    = self.duration_s,
-            user_profile  = self.user_profile,
+            signals={k: v for k, v in final.items()
+                     if k not in ("IBI_TIMES", "IBI_VALUES")},
+            time_vectors=time_vectors,
+            ibi_times_s=final["IBI_TIMES"],
+            ibi_values_ms=final["IBI_VALUES"],
+            events=events,
+            annotations=annotations,
+            metadata=metadata,
+            duration_s=self.duration_s,
+            user_profile=self.user_profile,
         )
 
     # ── User-adjusted baseline builder ───────────────────────────────────────
@@ -210,11 +210,11 @@ class DataSimulator:
         bp["EDA"]["tonic_mean"] = up.eda_tonic_mean
 
         # BVP — user's resting HR and BVP amplitude
-        bp["BVP"]["hr_bpm"]    = up.hr_resting
+        bp["BVP"]["hr_bpm"] = up.hr_resting
         bp["BVP"]["amplitude"] = up.bvp_amplitude
 
         # IBI — user's HRV
-        bp["IBI"]["mean_ms"]    = round(60_000 / up.hr_resting, 1)
+        bp["IBI"]["mean_ms"] = round(60_000 / up.hr_resting, 1)
         bp["IBI"]["hrv_std_ms"] = up.hrv_sdnn
 
         # ST — user's wrist temperature
@@ -226,13 +226,13 @@ class DataSimulator:
 
     def _schedule_events(self) -> List[EventConfig]:
         scheduler = EventScheduler(
-            duration_s       = self.duration_s,
-            n_events         = self.n_events,
-            event_duration_s = self.event_duration_s,
-            emotions         = self.emotions,
-            rng              = self._rng,
-            min_gap_s        = self.min_gap_s,
-            min_lead_s       = self.min_lead_s,
+            duration_s=self.duration_s,
+            n_events=self.n_events,
+            event_duration_s=self.event_duration_s,
+            emotions=self.emotions,
+            rng=self._rng,
+            min_gap_s=self.min_gap_s,
+            min_lead_s=self.min_lead_s,
         )
         events = scheduler.schedule()
         for ev in events:
@@ -243,7 +243,7 @@ class DataSimulator:
 
     def _generate_baselines(self) -> dict:
         dur = self.duration_s
-        bp  = self._baseline
+        bp = self._baseline
         rng = self._rng
         signals = {}
 
@@ -252,10 +252,10 @@ class DataSimulator:
 
         ibi_times, ibi_vals = generate_ibi_sequence(
             dur, bp["BVP"]["hr_bpm"], bp["IBI"]["hrv_std_ms"], rng)
-        signals["BVP"]       = generate_bvp_from_beats(
+        signals["BVP"] = generate_bvp_from_beats(
             dur, SAMPLING_RATES["BVP"], ibi_times, ibi_vals, bp["BVP"]["amplitude"])
         signals["IBI_TIMES"] = ibi_times
-        signals["IBI_VALUES"]= ibi_vals
+        signals["IBI_VALUES"] = ibi_vals
 
         signals["ST"] = generate_st_baseline(
             dur, SAMPLING_RATES["ST"], bp["ST"], rng)
@@ -272,20 +272,20 @@ class DataSimulator:
 
     def _apply_events(self, signals: dict, events: List[EventConfig]) -> dict:
         result = {k: v.copy() for k, v in signals.items()}
-        up     = self.user_profile
+        up = self.user_profile
 
         # Reactivity factors (1.0 if no user profile)
-        eda_rx  = up.eda_reactivity  if up else 1.0
-        hr_rx   = up.hr_reactivity   if up else 1.0
-        move_rx = up.movement_scale  if up else 1.0
+        eda_rx = up.eda_reactivity if up else 1.0
+        hr_rx = up.hr_reactivity if up else 1.0
+        move_rx = up.movement_scale if up else 1.0
 
         for ev in events:
             prof = ev.profile
 
             # ── EDA ───────────────────────────────────────────────────────
-            fs  = SAMPLING_RATES["EDA"]
-            i0  = int(ev.start_s * fs)
-            i1  = min(int(ev.end_s * fs), len(result["EDA"]))
+            fs = SAMPLING_RATES["EDA"]
+            i0 = int(ev.start_s * fs)
+            i1 = min(int(ev.end_s * fs), len(result["EDA"]))
             dur = (i1 - i0) / fs
             if dur >= 1.0:
                 # Scale EDA profile by user reactivity
@@ -294,17 +294,17 @@ class DataSimulator:
                 result["EDA"][i0:i1] += delta[:i1 - i0]
 
             # ── BVP / IBI ─────────────────────────────────────────────────
-            fs  = SAMPLING_RATES["BVP"]
-            i0  = int(ev.start_s * fs)
-            i1  = min(int(ev.end_s * fs), len(result["BVP"]))
+            fs = SAMPLING_RATES["BVP"]
+            i0 = int(ev.start_s * fs)
+            i1 = min(int(ev.end_s * fs), len(result["BVP"]))
             dur = (i1 - i0) / fs
             if dur >= 1.0:
-                base_hr   = self._baseline["BVP"]["hr_bpm"]
-                base_hrv  = self._baseline["IBI"]["hrv_std_ms"]
-                hr_delta  = prof["BVP"]["hr_delta_bpm"] * hr_rx
-                event_hr  = float(np.clip(base_hr + hr_delta, 40, 200))
+                base_hr = self._baseline["BVP"]["hr_bpm"]
+                base_hrv = self._baseline["IBI"]["hrv_std_ms"]
+                hr_delta = prof["BVP"]["hr_delta_bpm"] * hr_rx
+                event_hr = float(np.clip(base_hr + hr_delta, 40, 200))
                 event_hrv = base_hrv * prof["BVP"]["hrv_factor"]
-                ev_amp    = self._baseline["BVP"]["amplitude"] * prof["BVP"]["amplitude_factor"]
+                ev_amp = self._baseline["BVP"]["amplitude"] * prof["BVP"]["amplitude_factor"]
 
                 ev_t, ev_v = generate_ibi_sequence(dur, event_hr, event_hrv, self._rng)
                 result["BVP"][i0:i1] = generate_bvp_from_beats(
@@ -312,14 +312,14 @@ class DataSimulator:
 
                 # Patch IBI arrays
                 keep_before = result["IBI_TIMES"] < ev.start_s
-                keep_after  = result["IBI_TIMES"] >= ev.end_s
+                keep_after = result["IBI_TIMES"] >= ev.end_s
                 ev_t_global = ev_t + ev.start_s
                 ev_v_patched = ev_v + self._rng.normal(
                     prof["IBI"]["delta_mean_ms"] * 0.3,
                     prof["IBI"]["delta_std_ms"],
                     len(ev_v),
                 )
-                result["IBI_TIMES"]  = np.concatenate([
+                result["IBI_TIMES"] = np.concatenate([
                     result["IBI_TIMES"][keep_before],
                     ev_t_global,
                     result["IBI_TIMES"][keep_after],
@@ -331,18 +331,18 @@ class DataSimulator:
                 ])
 
             # ── ST ────────────────────────────────────────────────────────
-            fs  = SAMPLING_RATES["ST"]
-            i0  = int(ev.start_s * fs)
-            i1  = min(int(ev.end_s * fs), len(result["ST"]))
+            fs = SAMPLING_RATES["ST"]
+            i0 = int(ev.start_s * fs)
+            i1 = min(int(ev.end_s * fs), len(result["ST"]))
             dur = (i1 - i0) / fs
             if dur >= 1.0:
                 delta = generate_st_event_signal(dur, fs, prof["ST"])
                 result["ST"][i0:i1] += delta[:i1 - i0]
 
             # ── ACC ───────────────────────────────────────────────────────
-            fs  = SAMPLING_RATES["ACC_X"]
-            i0  = int(ev.start_s * fs)
-            i1  = min(int(ev.end_s * fs), len(result["ACC_X"]))
+            fs = SAMPLING_RATES["ACC_X"]
+            i0 = int(ev.start_s * fs)
+            i1 = min(int(ev.end_s * fs), len(result["ACC_X"]))
             dur = (i1 - i0) / fs
             if dur >= 1.0:
                 scaled_acc = self._scale_acc_profile(prof["ACC"], move_rx)
@@ -358,8 +358,8 @@ class DataSimulator:
 
     def _inject_noise(self, signals: dict) -> dict:
         noise_seed = int(self._rng.integers(0, 99_999))
-        injector   = NoiseInjector(level=self.noise_level, seed=noise_seed)
-        noisy      = injector.inject(signals)
+        injector = NoiseInjector(level=self.noise_level, seed=noise_seed)
+        noisy = injector.inject(signals)
         # Apply electrode contact quality to EDA noise
         if self.user_profile and "EDA" in noisy:
             contact = self.user_profile.noise_contact
@@ -411,9 +411,9 @@ class DataSimulator:
     def _scale_eda_profile(prof: dict, factor: float) -> dict:
         """Return a copy of the EDA event profile scaled by reactivity factor."""
         s = dict(prof)
-        s["tonic_delta"]        = prof["tonic_delta"]        * factor
+        s["tonic_delta"] = prof["tonic_delta"] * factor
         s["scr_amplitude_mean"] = prof["scr_amplitude_mean"] * factor
-        s["scr_amplitude_std"]  = prof["scr_amplitude_std"]  * factor
+        s["scr_amplitude_std"] = prof["scr_amplitude_std"] * factor
         return s
 
     @staticmethod
@@ -421,5 +421,5 @@ class DataSimulator:
         """Return a copy of the ACC event profile scaled by movement factor."""
         s = dict(prof)
         s["activity_amp"] = prof["activity_amp"] * factor
-        s["jitter"]       = prof["jitter"]       * factor
+        s["jitter"] = prof["jitter"] * factor
         return s

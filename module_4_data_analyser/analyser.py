@@ -16,6 +16,7 @@ Produces:
 =============================================================================
 """
 from __future__ import annotations
+from config import MODULE_VERSION, MODULE_LABEL, OUTPUT_ROOT, META_COLS
 
 import re
 import sys
@@ -30,14 +31,12 @@ import pandas as pd
 MODULE_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(MODULE_DIR))
 
-from config import MODULE_VERSION, MODULE_LABEL, OUTPUT_ROOT, META_COLS
-
 
 def _next_run_folder(custom_name: str = None) -> Path:
     output_root = MODULE_DIR / OUTPUT_ROOT
     output_root.mkdir(parents=True, exist_ok=True)
-    vtag    = f"{MODULE_LABEL}_v{MODULE_VERSION}"
-    prefix  = custom_name or f"{vtag}_run"
+    vtag = f"{MODULE_LABEL}_v{MODULE_VERSION}"
+    prefix = custom_name or f"{vtag}_run"
     pattern = re.compile(rf"^{re.escape(prefix)}_(\d+)$")
     existing = [int(m.group(1)) for d in output_root.iterdir()
                 if d.is_dir() and (m := pattern.match(d.name))]
@@ -49,8 +48,8 @@ def _next_run_folder(custom_name: str = None) -> Path:
 
 def _proxy_col(sig: str) -> str:
     """Return the expected value column name for a signal."""
-    return {"EDA":"EDA_uS","BVP":"BVP_nT","IBI":"IBI_ms",
-            "ST":"ST_degC","ACC":"ACC_X_g"}.get(sig, sig + "_val")
+    return {"EDA": "EDA_uS", "BVP": "BVP_nT", "IBI": "IBI_ms",
+            "ST": "ST_degC", "ACC": "ACC_X_g"}.get(sig, sig + "_val")
 
 
 class DataAnalyser:
@@ -68,25 +67,25 @@ class DataAnalyser:
 
     def __init__(
         self,
-        threshold_window_s:   float = 300.0,
+        threshold_window_s: float = 300.0,
         threshold_mad_factor: float = 3.0,
-        threshold_sustain_s:  float = 30.0,
-        out_name:             str   = None,
-        verbose:              bool  = True,
+        threshold_sustain_s: float = 30.0,
+        out_name: str = None,
+        verbose: bool = True,
     ):
-        self.threshold_window_s   = threshold_window_s
+        self.threshold_window_s = threshold_window_s
         self.threshold_mad_factor = threshold_mad_factor
-        self.threshold_sustain_s  = threshold_sustain_s
-        self.out_name             = out_name
-        self.verbose              = verbose
+        self.threshold_sustain_s = threshold_sustain_s
+        self.out_name = out_name
+        self.verbose = verbose
 
     # ── Public API ─────────────────────────────────────────────────────────
 
     def run(
         self,
-        source:     Union[str, Path, dict],
+        source: Union[str, Path, dict],
         session_id: str = "unknown",
-        user_id:    str = "unknown",
+        user_id: str = "unknown",
     ) -> dict:
         """
         Run full analysis pipeline.
@@ -97,7 +96,7 @@ class DataAnalyser:
                    'signals'      — {name: DataFrame} (raw cleaned signals)
                    'features_raw' — {name: DataFrame} (M3 feature CSVs)
         """
-        t0         = time.time()
+        t0 = time.time()
         run_folder = _next_run_folder(self.out_name)
 
         self._log("=" * 64)
@@ -117,10 +116,10 @@ class DataAnalyser:
         self._log("\n[M4] Step 1/5 — Temporal signal analysis ...")
         from signal_analyser import SignalAnalyser
         sig_results = SignalAnalyser(
-            threshold_window_s   = self.threshold_window_s,
-            threshold_mad_factor = self.threshold_mad_factor,
-            threshold_sustain_s  = self.threshold_sustain_s,
-            verbose              = self.verbose,
+            threshold_window_s=self.threshold_window_s,
+            threshold_mad_factor=self.threshold_mad_factor,
+            threshold_sustain_s=self.threshold_sustain_s,
+            verbose=self.verbose,
         ).analyse_all(signals)
 
         # ── Step 2: Statistical analyses ──────────────────────────────────
@@ -130,24 +129,25 @@ class DataAnalyser:
             pairwise_mannwhitney, correlation_feature_target,
             correlation_feature_matrix, signal_pct_change_summary,
         )
-        desc_df    = descriptive_analysis(combined)
-        kw_df      = kruskal_wallis_analysis(combined)
-        top_feats  = kw_df[kw_df["significant"]].head(20)["feature"].tolist() \
-                     if not kw_df.empty and "significant" in kw_df.columns else None
-        pair_df    = pairwise_mannwhitney(combined, top_features=top_feats)
-        corr_t_df  = correlation_feature_target(combined)
+        desc_df = descriptive_analysis(combined)
+        kw_df = kruskal_wallis_analysis(combined)
+        top_feats = kw_df[kw_df["significant"]].head(20)["feature"].tolist() \
+            if not kw_df.empty and "significant" in kw_df.columns else None
+        pair_df = pairwise_mannwhitney(combined, top_features=top_feats)
+        corr_t_df = correlation_feature_target(combined)
         corr_m_df, _feats = correlation_feature_matrix(combined)
-        pct_df     = signal_pct_change_summary(sig_results["event_dynamics"])
+        pct_df = signal_pct_change_summary(sig_results["event_dynamics"])
 
         self._log(f"  Descriptive: {len(desc_df)} rows")
-        self._log(f"  Kruskal-Wallis: {int(kw_df['significant'].sum()) if not kw_df.empty and 'significant' in kw_df.columns else 0} significant features")
+        self._log(
+            f"  Kruskal-Wallis: {int(kw_df['significant'].sum()) if not kw_df.empty and 'significant' in kw_df.columns else 0} significant features")  # noqa: E501
         self._log(f"  Corr target: {len(corr_t_df)} features")
 
         # ── Step 3: Visualisations ─────────────────────────────────────────
         self._log("\n[M4] Step 3/5 — Generating visualisations ...")
         from visualiser import AnalysisVisualiser
-        vis     = AnalysisVisualiser(run_folder)
-        plots   = {}
+        vis = AnalysisVisualiser(run_folder)
+        plots = {}
 
         plots.update(vis.plot_descriptive_boxplots(features))
         p = vis.plot_pct_change(pct_df)
@@ -189,30 +189,30 @@ class DataAnalyser:
         self._log("\n[M4] Step 4/5 — Generating report ...")
         from reporter import AnalysisReporter
         meta = {
-            "session_id":      session_id,
-            "user_id":         user_id,
-            "module_version":  MODULE_VERSION,
-            "window_s":        self.threshold_window_s,
-            "mad_factor":      self.threshold_mad_factor,
-            "sustain_s":       self.threshold_sustain_s,
-            "n_signals":       len(signals),
-            "n_feature_cols":  combined.shape[1],
-            "n_windows":       len(combined),
+            "session_id": session_id,
+            "user_id": user_id,
+            "module_version": MODULE_VERSION,
+            "window_s": self.threshold_window_s,
+            "mad_factor": self.threshold_mad_factor,
+            "sustain_s": self.threshold_sustain_s,
+            "n_signals": len(signals),
+            "n_feature_cols": combined.shape[1],
+            "n_windows": len(combined),
         }
         AnalysisReporter(run_folder).generate(
-            session_id      = session_id,
-            user_id         = user_id,
-            metadata        = meta,
-            descriptive_df  = desc_df,
-            kruskal_df      = kw_df,
-            pairwise_df     = pair_df,
-            corr_target_df  = corr_t_df,
-            corr_matrix_df  = corr_m_df,
-            dynamics_df     = sig_results["event_dynamics"],
-            return_df       = sig_results["return_summary"],
-            pct_change_df   = pct_df,
-            threshold_df    = sig_results["threshold_events"],
-            plot_paths      = plots,
+            session_id=session_id,
+            user_id=user_id,
+            metadata=meta,
+            descriptive_df=desc_df,
+            kruskal_df=kw_df,
+            pairwise_df=pair_df,
+            corr_target_df=corr_t_df,
+            corr_matrix_df=corr_m_df,
+            dynamics_df=sig_results["event_dynamics"],
+            return_df=sig_results["return_summary"],
+            pct_change_df=pct_df,
+            threshold_df=sig_results["threshold_events"],
+            plot_paths=plots,
         )
 
         # ── Step 5: Metadata JSON ───────────────────────────────────────────
@@ -225,16 +225,16 @@ class DataAnalyser:
         self._log(f"\n[M4] Done in {elapsed:.1f}s  →  {run_folder}\n")
 
         return {
-            "run_folder":       run_folder,
-            "descriptive":      desc_df,
-            "kruskal":          kw_df,
-            "pairwise":         pair_df,
-            "corr_target":      corr_t_df,
-            "event_dynamics":   sig_results["event_dynamics"],
-            "return_summary":   sig_results["return_summary"],
+            "run_folder": run_folder,
+            "descriptive": desc_df,
+            "kruskal": kw_df,
+            "pairwise": pair_df,
+            "corr_target": corr_t_df,
+            "event_dynamics": sig_results["event_dynamics"],
+            "return_summary": sig_results["return_summary"],
             "threshold_events": sig_results["threshold_events"],
-            "pct_change":       pct_df,
-            "plots":            plots,
+            "pct_change": pct_df,
+            "plots": plots,
         }
 
     # ── Data loader ────────────────────────────────────────────────────────
@@ -246,7 +246,7 @@ class DataAnalyser:
         Returns (signals_dict, features_dict, combined_df)
         """
         if isinstance(source, dict):
-            signals  = source.get("signals", {})
+            signals = source.get("signals", {})
             features = source.get("features_raw", {})
             combined = source.get("combined", pd.DataFrame())
             return signals, features, combined
@@ -256,12 +256,12 @@ class DataAnalyser:
         signals, features = {}, {}
         combined = pd.DataFrame()
 
-        raw_dir  = folder / "features_raw"
-        sig_dir  = folder  # M3 saves cleaned signal CSVs to the run folder too
+        raw_dir = folder / "features_raw"
+        sig_dir = folder  # M3 saves cleaned signal CSVs to the run folder too
 
         # Load raw signal files (from M3 run folder directly OR from M2A output)
-        for sig_name, fname in [("EDA","EDA.csv"),("BVP","BVP.csv"),
-                                  ("IBI","IBI.csv"),("ST","ST.csv"),("ACC","ACC.csv")]:
+        for sig_name, fname in [("EDA", "EDA.csv"), ("BVP", "BVP.csv"),
+                                ("IBI", "IBI.csv"), ("ST", "ST.csv"), ("ACC", "ACC.csv")]:
             # Try M3 folder first, then look for signal file anywhere
             for candidate in (folder / fname, folder.parent / fname):
                 if candidate.exists():
@@ -273,11 +273,11 @@ class DataAnalyser:
 
         # Load feature CSVs
         if raw_dir.exists():
-            for sig_name, fname in [("EDA","EDA_features.csv"),
-                                     ("BVP","BVP_features.csv"),
-                                     ("IBI","IBI_features.csv"),
-                                     ("ST","ST_features.csv"),
-                                     ("ACC","ACC_features.csv")]:
+            for sig_name, fname in [("EDA", "EDA_features.csv"),
+                                    ("BVP", "BVP_features.csv"),
+                                    ("IBI", "IBI_features.csv"),
+                                    ("ST", "ST_features.csv"),
+                                    ("ACC", "ACC_features.csv")]:
                 fpath = raw_dir / fname
                 if fpath.exists():
                     df = pd.read_csv(fpath)
@@ -306,11 +306,12 @@ class DataAnalyser:
                     ]:
                         if candidate_root.exists():
                             for run_dir in sorted(candidate_root.iterdir(), reverse=True):
-                                if not run_dir.is_dir(): continue
+                                if not run_dir.is_dir():
+                                    continue
                                 found_here = {}
-                                for sig_name, fname in [("EDA","EDA.csv"),("BVP","BVP.csv"),
-                                                         ("IBI","IBI.csv"),("ST","ST.csv"),
-                                                         ("ACC","ACC.csv")]:
+                                for sig_name, fname in [("EDA", "EDA.csv"), ("BVP", "BVP.csv"),
+                                                        ("IBI", "IBI.csv"), ("ST", "ST.csv"),
+                                                        ("ACC", "ACC.csv")]:
                                     fpath = run_dir / fname
                                     if fpath.exists():
                                         df = pd.read_csv(fpath)
@@ -333,7 +334,7 @@ class DataAnalyser:
             proxy_map = {
                 "EDA": "eda_mean",       # mean EDA conductance over window
                 "BVP": "bvp_mean",       # mean BVP amplitude over window
-                "ST":  "st_mean",        # mean skin temperature over window
+                "ST": "st_mean",        # mean skin temperature over window
                 "ACC": "acc_svm_mean",   # mean SVM magnitude over window
                 "IBI": "ibi_mean",       # mean RR interval over window
             }
@@ -342,11 +343,13 @@ class DataAnalyser:
                 if feat_col not in combined.columns:
                     continue
                 keep = [ts_col, feat_col]
-                if "target_label" in combined.columns: keep.append("target_label")
-                if "event_id" in combined.columns:     keep.append("event_id")
+                if "target_label" in combined.columns:
+                    keep.append("target_label")
+                if "event_id" in combined.columns:
+                    keep.append("event_id")
                 keep = [c for c in keep if c in combined.columns]
-                sub  = combined[keep].copy()
-                sub  = sub.rename(columns={ts_col: "timestamp_s", feat_col: _proxy_col(sig)})
+                sub = combined[keep].copy()
+                sub = sub.rename(columns={ts_col: "timestamp_s", feat_col: _proxy_col(sig)})
                 signals[sig] = sub
             if signals:
                 self._log(f"  Proxy signals built for: {list(signals.keys())} (window-level)")

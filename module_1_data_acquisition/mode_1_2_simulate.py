@@ -23,6 +23,10 @@ Module 1A's DataSimulator directly.
 """
 
 from __future__ import annotations
+from pipeline_packet import (
+    PipelinePacket, build_packet_from_dataframes,
+    SOURCE_SIMULATED, _new_session_id,
+)
 import sys
 import json
 import time
@@ -32,21 +36,17 @@ import numpy as np
 import pandas as pd
 
 # ── Locate Module 1A and add to path ─────────────────────────────────────────
-MODULE_DIR    = Path(__file__).resolve().parent
+MODULE_DIR = Path(__file__).resolve().parent
 MODULE_1A_DIR = MODULE_DIR.parent / "module_2a_data_simulation"
 if str(MODULE_1A_DIR) not in sys.path:
     sys.path.insert(0, str(MODULE_1A_DIR))
 
-from pipeline_packet import (
-    PipelinePacket, build_packet_from_dataframes,
-    SOURCE_SIMULATED, _new_session_id,
-)
 
 # Module 1A imports
 try:
-    from simulator      import DataSimulator
-    from user_profiles  import UserProfileGenerator
-    from config         import (
+    from simulator import DataSimulator
+    from user_profiles import UserProfileGenerator
+    from config import (
         EMOTIONS_ALL, DEFAULT_DURATION_S, DEFAULT_N_EVENTS,
         DEFAULT_NOISE_LEVEL, DEFAULT_SEED, DEFAULT_N_USERS,
         MODULE_VERSION as M1A_VERSION,
@@ -62,13 +62,13 @@ except ImportError as e:
 # ─────────────────────────────────────────────────────────────────────────────
 
 SIM_DEFAULTS = {
-    "duration_s":       300,
-    "n_events":         5,
+    "duration_s": 300,
+    "n_events": 5,
     "event_duration_s": 30.0,
-    "emotions":         None,
-    "noise_level":      "medium",
-    "seed":             42,
-    "n_users":          1,
+    "emotions": None,
+    "noise_level": "medium",
+    "seed": 42,
+    "n_users": 1,
 }
 
 
@@ -97,17 +97,17 @@ class SimulationConnector:
 
     def __init__(
         self,
-        duration_s:       float                       = SIM_DEFAULTS["duration_s"],
-        n_events:         Union[int, str]             = SIM_DEFAULTS["n_events"],
-        event_duration_s: Union[float, str]           = SIM_DEFAULTS["event_duration_s"],
-        emotions:         Optional[Union[str, list]]  = SIM_DEFAULTS["emotions"],
-        noise_level:      str                         = SIM_DEFAULTS["noise_level"],
-        seed:             int                         = SIM_DEFAULTS["seed"],
-        n_users:          int                         = SIM_DEFAULTS["n_users"],
-        shared_events:    bool                        = False,
-        save_m1a_output:  bool                        = False,
-        output_dir:       Optional[Path]              = None,
-        verbose:          bool                        = True,
+        duration_s: float = SIM_DEFAULTS["duration_s"],
+        n_events: Union[int, str] = SIM_DEFAULTS["n_events"],
+        event_duration_s: Union[float, str] = SIM_DEFAULTS["event_duration_s"],
+        emotions: Optional[Union[str, list]] = SIM_DEFAULTS["emotions"],
+        noise_level: str = SIM_DEFAULTS["noise_level"],
+        seed: int = SIM_DEFAULTS["seed"],
+        n_users: int = SIM_DEFAULTS["n_users"],
+        shared_events: bool = False,
+        save_m1a_output: bool = False,
+        output_dir: Optional[Path] = None,
+        verbose: bool = True,
     ):
         if not M2A_AVAILABLE:
             raise ImportError(
@@ -116,17 +116,17 @@ class SimulationConnector:
                 f"Ensure module_2a_data_simulation is in the repo root."
             )
 
-        self.duration_s       = float(duration_s)
-        self.n_events         = n_events
+        self.duration_s = float(duration_s)
+        self.n_events = n_events
         self.event_duration_s = event_duration_s
-        self.emotions         = emotions
-        self.noise_level      = noise_level
-        self.seed             = seed
-        self.n_users          = n_users
-        self.shared_events    = shared_events
-        self.save_m1a_output  = save_m1a_output
-        self.output_dir       = Path(output_dir) if output_dir else None
-        self.verbose          = verbose
+        self.emotions = emotions
+        self.noise_level = noise_level
+        self.seed = seed
+        self.n_users = n_users
+        self.shared_events = shared_events
+        self.save_m1a_output = save_m1a_output
+        self.output_dir = Path(output_dir) if output_dir else None
+        self.verbose = verbose
 
     # ── Public API ────────────────────────────────────────────────────────
 
@@ -162,11 +162,11 @@ class SimulationConnector:
         if self.shared_events and self.n_users > 1:
             from event_scheduler import EventScheduler
             shared_ev = EventScheduler(
-                duration_s       = self.duration_s,
-                n_events         = self.n_events,
-                event_duration_s = self.event_duration_s,
-                emotions         = self.emotions,
-                rng              = np.random.default_rng(self.seed),
+                duration_s=self.duration_s,
+                n_events=self.n_events,
+                event_duration_s=self.event_duration_s,
+                emotions=self.emotions,
+                rng=np.random.default_rng(self.seed),
             ).schedule()
             self._log(f"  Shared events: {len(shared_ev)} events scheduled")
 
@@ -175,13 +175,13 @@ class SimulationConnector:
             self._log(f"\n  Simulating {profile.user_id} ...")
 
             sim = DataSimulator(
-                duration_s       = self.duration_s,
-                n_events         = self.n_events,
-                event_duration_s = self.event_duration_s,
-                emotions         = self.emotions,
-                noise_level      = self.noise_level,
-                seed             = self.seed,
-                user_profile     = profile,
+                duration_s=self.duration_s,
+                n_events=self.n_events,
+                event_duration_s=self.event_duration_s,
+                emotions=self.emotions,
+                noise_level=self.noise_level,
+                seed=self.seed,
+                user_profile=profile,
             )
 
             if shared_ev is not None:
@@ -192,7 +192,7 @@ class SimulationConnector:
             # Optionally save Module 1A outputs to disk
             if self.save_m1a_output:
                 from visualizer import SignalVisualizer
-                from exporter   import DataExporter
+                from exporter import DataExporter
                 out_dir = self.output_dir or (
                     MODULE_1A_DIR / "outputs" / f"m2_sim_{profile.user_id}"
                 )
@@ -217,11 +217,11 @@ class SimulationConnector:
         """Convert a Module 1A SimulationResult into a PipelinePacket."""
 
         # ── Build per-signal DataFrames ─────────────────────────────────
-        up  = result.user_profile
+        up = result.user_profile
         uid = up.user_id if up else "simulated_user"
 
         def _labels(timestamps):
-            n   = len(timestamps)
+            n = len(timestamps)
             lbl = np.full(n, "baseline", dtype=object)
             eid = np.zeros(n, dtype=int)
             cat = np.full(n, "baseline", dtype=object)
@@ -271,18 +271,18 @@ class SimulationConnector:
         # ── Build combined DataFrame ──────────────────────────────────
         from scipy.interpolate import interp1d
         fs_ref = SAMPLING_RATES["BVP"]
-        t_ref  = result.time_vectors["BVP"]
-        n_ref  = len(result.signals["BVP"])
+        t_ref = result.time_vectors["BVP"]
+        n_ref = len(result.signals["BVP"])
         l, e, c = _labels(t_ref)
 
         combined = pd.DataFrame({
-            "timestamp_s":  np.round(t_ref, 5),
+            "timestamp_s": np.round(t_ref, 5),
             "target_label": l, "event_id": e, "category": c,
-            "BVP_nT":       result.signals["BVP"],
+            "BVP_nT": result.signals["BVP"],
         })
 
-        for sn, col in [("EDA","EDA_uS"),("ST","ST_degC"),
-                        ("ACC_X","ACC_X_g"),("ACC_Y","ACC_Y_g"),("ACC_Z","ACC_Z_g")]:
+        for sn, col in [("EDA", "EDA_uS"), ("ST", "ST_degC"),
+                        ("ACC_X", "ACC_X_g"), ("ACC_Y", "ACC_Y_g"), ("ACC_Z", "ACC_Z_g")]:
             f = interp1d(result.time_vectors[sn], result.signals[sn],
                          kind="linear", bounds_error=False,
                          fill_value="extrapolate")
@@ -297,10 +297,10 @@ class SimulationConnector:
 
         # ── Extra metadata ────────────────────────────────────────────
         extra = {
-            "m1a_version":   M1A_VERSION,
-            "n_events":      len(result.events),
+            "m1a_version": M1A_VERSION,
+            "n_events": len(result.events),
             "events": [
-                {"event_id": i+1, "emotion": ev.emotion,
+                {"event_id": i + 1, "emotion": ev.emotion,
                  "start_s": ev.start_s, "end_s": ev.end_s}
                 for i, ev in enumerate(result.events)
             ],
@@ -309,13 +309,13 @@ class SimulationConnector:
             extra["user_profile"] = up.to_dict()
 
         return build_packet_from_dataframes(
-            signals      = signals,
-            combined     = combined,
-            source_type  = SOURCE_SIMULATED,
-            is_annotated = True,
-            user_id      = uid,
-            session_id   = _new_session_id("SIM"),
-            extra_meta   = extra,
+            signals=signals,
+            combined=combined,
+            source_type=SOURCE_SIMULATED,
+            is_annotated=True,
+            user_id=uid,
+            session_id=_new_session_id("SIM"),
+            extra_meta=extra,
         )
 
     def _log(self, msg):
@@ -456,7 +456,7 @@ class InteractiveSimSetup:
 
     def _ask_choice(self, prompt, choices, default):
         opts = "/".join(choices)
-        raw  = input(f"  {prompt} ({opts}) [{default}]: ").strip()
+        raw = input(f"  {prompt} ({opts}) [{default}]: ").strip()
         if raw == "":
             return default
         if raw in choices:
@@ -470,16 +470,16 @@ class InteractiveSimSetup:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def simulate_data(
-    duration_s:       float                      = SIM_DEFAULTS["duration_s"],
-    n_events:         Union[int, str]            = SIM_DEFAULTS["n_events"],
-    event_duration_s: Union[float, str]          = SIM_DEFAULTS["event_duration_s"],
-    emotions:         Optional[Union[str, list]] = SIM_DEFAULTS["emotions"],
-    noise_level:      str                        = SIM_DEFAULTS["noise_level"],
-    seed:             int                        = SIM_DEFAULTS["seed"],
-    n_users:          int                        = SIM_DEFAULTS["n_users"],
-    shared_events:    bool                       = False,
-    save_m1a_output:  bool                       = False,
-    verbose:          bool                       = True,
+    duration_s: float = SIM_DEFAULTS["duration_s"],
+    n_events: Union[int, str] = SIM_DEFAULTS["n_events"],
+    event_duration_s: Union[float, str] = SIM_DEFAULTS["event_duration_s"],
+    emotions: Optional[Union[str, list]] = SIM_DEFAULTS["emotions"],
+    noise_level: str = SIM_DEFAULTS["noise_level"],
+    seed: int = SIM_DEFAULTS["seed"],
+    n_users: int = SIM_DEFAULTS["n_users"],
+    shared_events: bool = False,
+    save_m1a_output: bool = False,
+    verbose: bool = True,
 ) -> list[PipelinePacket]:
     """
     Shorthand: simulate data and return PipelinePacket(s).
@@ -487,16 +487,16 @@ def simulate_data(
     Returns a list — one packet per user (length 1 for single user).
     """
     return SimulationConnector(
-        duration_s       = duration_s,
-        n_events         = n_events,
-        event_duration_s = event_duration_s,
-        emotions         = emotions,
-        noise_level      = noise_level,
-        seed             = seed,
-        n_users          = n_users,
-        shared_events    = shared_events,
-        save_m1a_output  = save_m1a_output,
-        verbose          = verbose,
+        duration_s=duration_s,
+        n_events=n_events,
+        event_duration_s=event_duration_s,
+        emotions=emotions,
+        noise_level=noise_level,
+        seed=seed,
+        n_users=n_users,
+        shared_events=shared_events,
+        save_m1a_output=save_m1a_output,
+        verbose=verbose,
     ).run()
 
 

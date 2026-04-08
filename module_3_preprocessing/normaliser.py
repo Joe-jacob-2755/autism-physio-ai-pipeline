@@ -81,7 +81,7 @@ class FeatureNormaliser:
 
     def __init__(self, scaler_type: str = SCALER_TYPE, verbose: bool = True):
         self.scaler_type = scaler_type
-        self.verbose     = verbose
+        self.verbose = verbose
         self._scalers: Dict[str, object] = {}   # one scaler per signal
         self._feature_cols: Dict[str, List[str]] = {}
 
@@ -104,9 +104,9 @@ class FeatureNormaliser:
         scaled = {}
         for sig_name, df in feature_dfs.items():
             scaler, feat_cols, df_scaled = self._fit_transform_one(sig_name, df)
-            self._scalers[sig_name]      = scaler
+            self._scalers[sig_name] = scaler
             self._feature_cols[sig_name] = feat_cols
-            scaled[sig_name]             = df_scaled
+            scaled[sig_name] = df_scaled
             self._log(f"  [Normaliser] {sig_name}: scaled {len(feat_cols)} features "
                       f"({self.scaler_type})")
         return scaled
@@ -122,8 +122,8 @@ class FeatureNormaliser:
                     f"No fitted scaler for '{sig_name}'. Call fit_transform first."
                 )
             feat_cols = self._feature_cols[sig_name]
-            df_out    = df.copy()
-            present   = [c for c in feat_cols if c in df_out.columns]
+            df_out = df.copy()
+            present = [c for c in feat_cols if c in df_out.columns]
             if present:
                 df_out[present] = self._scalers[sig_name].transform(
                     df_out[present].values
@@ -144,7 +144,7 @@ class FeatureNormaliser:
         with open(path, "rb") as f:
             obj = pickle.load(f)
         n = cls(scaler_type=obj["scaler_type"])
-        n._scalers      = obj["scalers"]
+        n._scalers = obj["scalers"]
         n._feature_cols = obj["feature_cols"]
         return n
 
@@ -249,7 +249,7 @@ class FeatureFuser:
 
     def fuse(
         self,
-        feature_dfs:  Dict[str, pd.DataFrame],
+        feature_dfs: Dict[str, pd.DataFrame],
         demographics: Optional[dict] = None,
     ) -> Tuple[Dict[str, pd.DataFrame], pd.DataFrame]:
         """
@@ -303,7 +303,7 @@ class FeatureFuser:
                          and c not in merged.columns]
             keep = ["session_id", "user_id", "window_start_s"] + feat_cols
             keep = [c for c in keep if c in df.columns]
-            sub  = df[keep].copy()
+            sub = df[keep].copy()
 
             merged = pd.merge_asof(
                 merged.sort_values("window_start_s"),

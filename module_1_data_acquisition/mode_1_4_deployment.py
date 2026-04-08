@@ -56,26 +56,26 @@ class DeploymentIngester:
     """
 
     SIGNAL_FILES = {
-        "EDA": ("EDA.csv",  ["EDA_uS"]),
-        "BVP": ("BVP.csv",  ["BVP_nT"]),
-        "IBI": ("IBI.csv",  ["IBI_ms"]),
-        "ST":  ("ST.csv",   ["ST_degC"]),
-        "ACC": ("ACC.csv",  ["ACC_X_g", "ACC_Y_g", "ACC_Z_g"]),
+        "EDA": ("EDA.csv", ["EDA_uS"]),
+        "BVP": ("BVP.csv", ["BVP_nT"]),
+        "IBI": ("IBI.csv", ["IBI_ms"]),
+        "ST": ("ST.csv", ["ST_degC"]),
+        "ACC": ("ACC.csv", ["ACC_X_g", "ACC_Y_g", "ACC_Z_g"]),
     }
 
     def __init__(
         self,
-        source_path:  str | Path,
-        user_id:      str           = "deployment_participant",
-        session_id:   Optional[str] = None,
-        strip_labels: bool          = True,
-        verbose:      bool          = True,
+        source_path: str | Path,
+        user_id: str = "deployment_participant",
+        session_id: Optional[str] = None,
+        strip_labels: bool = True,
+        verbose: bool = True,
     ):
-        self.source_path  = Path(source_path)
-        self.user_id      = user_id
-        self.session_id   = session_id or _new_session_id("DEP")
+        self.source_path = Path(source_path)
+        self.user_id = user_id
+        self.session_id = session_id or _new_session_id("DEP")
         self.strip_labels = strip_labels
-        self.verbose      = verbose
+        self.verbose = verbose
 
     # ── Public API ─────────────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ class DeploymentIngester:
 
         # Strip annotation columns if present
         if self.strip_labels:
-            signals  = {k: self._strip(df) for k, df in signals.items()}
+            signals = {k: self._strip(df) for k, df in signals.items()}
             combined = self._strip(combined)
         else:
             # Just check — warn if labels found but we're in deployment mode
@@ -105,19 +105,19 @@ class DeploymentIngester:
         # Load metadata
         extra = self._load_metadata()
         extra.update({
-            "source_path":    str(self.source_path),
+            "source_path": str(self.source_path),
             "deployment_mode": True,
-            "ingested_at":    datetime.now().isoformat(),
+            "ingested_at": datetime.now().isoformat(),
         })
 
         packet = build_packet_from_dataframes(
-            signals      = signals,
-            combined     = combined,
-            source_type  = SOURCE_DEPLOYMENT,
-            is_annotated = False,
-            user_id      = self.user_id,
-            session_id   = self.session_id,
-            extra_meta   = extra,
+            signals=signals,
+            combined=combined,
+            source_type=SOURCE_DEPLOYMENT,
+            is_annotated=False,
+            user_id=self.user_id,
+            session_id=self.session_id,
+            extra_meta=extra,
         )
 
         self._log(f"[Deployment 2.4] Packet ready.  is_annotated=False.")
@@ -131,10 +131,10 @@ class DeploymentIngester:
         # Import inline to avoid circular deps
         from mode_1_1_import import DataImporter
         importer = DataImporter(
-            source_path = source,
-            user_id     = self.user_id,
-            session_id  = self.session_id,
-            verbose     = False,
+            source_path=source,
+            user_id=self.user_id,
+            session_id=self.session_id,
+            verbose=False,
         )
         # Use importer's internal load methods directly
         if source.is_file():
@@ -171,10 +171,10 @@ class DeploymentIngester:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def ingest_for_deployment(
-    source_path:  str | Path,
-    user_id:      str  = "deployment_participant",
+    source_path: str | Path,
+    user_id: str = "deployment_participant",
     strip_labels: bool = True,
-    verbose:      bool = True,
+    verbose: bool = True,
 ) -> PipelinePacket:
     """
     Shorthand: ingest unannotated data for the deployment inference path.
@@ -191,8 +191,8 @@ def ingest_for_deployment(
     PipelinePacket with is_annotated=False, routed to Module 9 (Deployment)
     """
     return DeploymentIngester(
-        source_path  = source_path,
-        user_id      = user_id,
-        strip_labels = strip_labels,
-        verbose      = verbose,
+        source_path=source_path,
+        user_id=user_id,
+        strip_labels=strip_labels,
+        verbose=verbose,
     ).run()

@@ -85,6 +85,5 @@
 
   // ── Workspace ─────────────────────────────────────────────────────────────
   "workbench.colorTheme": "Dark Modern",
-  "workbench.startupEditor": "readme",
-  "editor.defaultFormatter": "ms-python.black-formatter"
+  "workbench.startupEditor": "readme"
 }

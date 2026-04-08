@@ -45,8 +45,8 @@ REPO_ROOT = Path(__file__).resolve().parent
 
 # Module root directories
 M2A_DIR = REPO_ROOT / "module_2a_data_simulation"
-M1_DIR  = REPO_ROOT / "module_1_data_acquisition"
-M3_DIR  = REPO_ROOT / "module_3_preprocessing"
+M1_DIR = REPO_ROOT / "module_1_data_acquisition"
+M3_DIR = REPO_ROOT / "module_3_preprocessing"
 M4_DIR = REPO_ROOT / "module_4_data_analyser"
 
 PIPELINE_VERSION = "1.0.0"
@@ -65,6 +65,7 @@ _CONFLICTING_MODULES = {
     "analyser", "reporter", "signal_analyser", "statistical_analyser",
 }
 
+
 @contextmanager
 def _isolated_import(*module_dirs: Path):
     """
@@ -75,7 +76,7 @@ def _isolated_import(*module_dirs: Path):
         with _isolated_import(M1_DIR):
             from acquisition_module import DataAcquisitionModule
     """
-    saved_path    = list(sys.path)
+    saved_path = list(sys.path)
     saved_modules = {k: v for k, v in sys.modules.items()
                      if _is_pipeline_module(k)}
 
@@ -87,7 +88,7 @@ def _isolated_import(*module_dirs: Path):
     # Put the target module dirs at the very front of sys.path
     new_path = [str(d) for d in reversed(module_dirs)]
     sys.path[:] = new_path + [p for p in saved_path
-                               if p not in new_path]
+                              if p not in new_path]
     try:
         yield
     finally:
@@ -112,6 +113,7 @@ def _is_pipeline_module(name: str) -> bool:
 def _clear():
     os.system("cls" if os.name == "nt" else "clear")
 
+
 def _banner(subtitle=""):
     _clear()
     print()
@@ -126,11 +128,13 @@ def _banner(subtitle=""):
     print("  " + "═" * (WIDTH - 2))
     print()
 
+
 def _section(title):
     print()
     print("  " + "─" * (WIDTH - 4))
     print(f"  {title}")
     print("  " + "─" * (WIDTH - 4))
+
 
 def _step_header(n, total, title):
     print()
@@ -138,13 +142,20 @@ def _step_header(n, total, title):
     print(f"  ▶  Step {n}/{total}  —  {title}")
     print("  " + "═" * (WIDTH - 4))
 
-def _ok(msg):  print(f"  ✓  {msg}")
-def _info(msg): print(f"     {msg}")
+
+def _ok(msg):
+    print(f"  ✓  {msg}")
+
+
+def _info(msg):
+    print(f"     {msg}")
+
 
 def _ask(prompt, default=""):
     suffix = f" [{default}]" if default != "" else ""
     raw = input(f"\n  {prompt}{suffix}: ").strip()
     return raw if raw else str(default)
+
 
 def _ask_int(prompt, default, lo=1, hi=9999):
     while True:
@@ -157,6 +168,7 @@ def _ask_int(prompt, default, lo=1, hi=9999):
         except ValueError:
             print("  ✗  Please enter a whole number.")
 
+
 def _ask_float(prompt, default, lo=0.0):
     while True:
         raw = _ask(prompt, str(default))
@@ -168,18 +180,22 @@ def _ask_float(prompt, default, lo=0.0):
         except ValueError:
             print("  ✗  Please enter a number.")
 
+
 def _ask_int_or_random(prompt, default):
     raw = _ask(f"{prompt}  (number or 'random')", str(default))
     return "random" if raw.lower() == "random" else int(raw)
+
 
 def _ask_float_or_random(prompt, default):
     raw = _ask(f"{prompt}  (number or 'random')", str(default))
     return "random" if raw.lower() == "random" else float(raw)
 
+
 def _ask_yn(prompt, default=True):
     hint = "Y/n" if default else "y/N"
-    raw  = input(f"\n  {prompt}  ({hint}): ").strip().lower()
+    raw = input(f"\n  {prompt}  ({hint}): ").strip().lower()
     return default if raw == "" else raw in ("y", "yes")
+
 
 def _choose(prompt, options, labels=None):
     display = labels or [str(o) for o in options]
@@ -196,6 +212,7 @@ def _choose(prompt, options, labels=None):
         except ValueError:
             print("  ✗  Please enter a number.")
 
+
 def _pause(msg="  Press Enter to continue ..."):
     input(msg)
 
@@ -210,8 +227,8 @@ def _browse_data_folder(purpose="existing data") -> Optional[Path]:
     candidates, labels = [], []
     for out_root, tag in [
         (M2A_DIR / "outputs", "M2A"),
-        (M1_DIR  / "outputs", "M1"),
-        (M3_DIR  / "outputs", "M3"),
+        (M1_DIR / "outputs", "M1"),
+        (M3_DIR / "outputs", "M3"),
     ]:
         if out_root.exists():
             for d in sorted(out_root.iterdir()):
@@ -227,7 +244,7 @@ def _browse_data_folder(purpose="existing data") -> Optional[Path]:
                 n_users = len([x for x in d.iterdir()
                                if x.is_dir() and x.name.startswith("user_")])
                 suffix = f"  ({n_users} users)" if n_users > 0 \
-                         else f"  ({n_csv} CSVs)"
+                    else f"  ({n_csv} CSVs)"
                 candidates.append(d)
                 labels.append(f"[{tag}]  {rel.name}{suffix}")
 
@@ -235,7 +252,7 @@ def _browse_data_folder(purpose="existing data") -> Optional[Path]:
     print()
     for i, lbl in enumerate(labels[:-1], 1):
         print(f"    {i}.  {lbl}")
-    print(f"    {len(candidates)+1}.  {labels[-1]}")
+    print(f"    {len(candidates) + 1}.  {labels[-1]}")
 
     while True:
         raw = input(f"\n  Select [1]: ").strip() or "1"
@@ -256,18 +273,18 @@ def _browse_data_folder(purpose="existing data") -> Optional[Path]:
         if 0 <= idx < len(candidates):
             chosen = candidates[idx]
             user_dirs = sorted([x for x in chosen.iterdir()
-                                 if x.is_dir() and x.name.startswith("user_")])
+                                if x.is_dir() and x.name.startswith("user_")])
             if user_dirs:
                 _section("Multiple users found in this folder")
                 sub_labels = ["📦  Use entire folder (all users)"] + \
                              [u.name for u in user_dirs]
                 sub_idx = _choose("Which data to use?",
-                                   range(len(sub_labels)), sub_labels)
+                                  range(len(sub_labels)), sub_labels)
                 if sub_idx == 0:
                     return chosen
                 return user_dirs[sub_idx - 1]
             return chosen
-        print(f"  ✗  Enter 1–{len(candidates)+1}.")
+        print(f"  ✗  Enter 1–{len(candidates) + 1}.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -291,30 +308,30 @@ def _collect_m2_params() -> dict:
         ],
     )
     modes = ["import", "simulate", "live_file", "live_e4", "deployment"]
-    mode  = modes[mode_idx]
+    mode = modes[mode_idx]
     params = {"mode": mode}
 
     if mode == "import":
-        params["source"]  = _browse_data_folder("existing signal data")
+        params["source"] = _browse_data_folder("existing signal data")
         params["user_id"] = _ask("Participant ID", "imported_user")
 
     elif mode == "simulate":
         _section("⚙️  Simulation settings")
-        params["n_users"]    = _ask_int("Number of users", 1, 1, 500)
+        params["n_users"] = _ask_int("Number of users", 1, 1, 500)
         params["duration_s"] = _ask_float("Duration per user (seconds)", 300, 30)
-        params["n_events"]   = _ask_int_or_random("Events per user", 5)
-        params["event_dur"]  = _ask_float_or_random("Event duration (seconds)", 30)
+        params["n_events"] = _ask_int_or_random("Events per user", 5)
+        params["event_dur"] = _ask_float_or_random("Event duration (seconds)", 30)
 
         # Get emotion list safely — M1A emotions don't need import
         EMOTIONS_ALL = [
-            "Happy","Anger","Fear","Disgust","Sad","Surprise",
-            "Hunger","Thirst","Toilet","Tired",
+            "Happy", "Anger", "Fear", "Disgust", "Sad", "Surprise",
+            "Hunger", "Thirst", "Toilet", "Tired",
         ]
         print(f"\n  Available emotions: {', '.join(EMOTIONS_ALL)}")
         em_idx = _choose("Emotion mode", range(3),
-                          ["Random  — all 10 states randomly",
-                           "Single  — one emotion repeated",
-                           "Subset  — choose a list"])
+                         ["Random  — all 10 states randomly",
+                          "Single  — one emotion repeated",
+                          "Subset  — choose a list"])
         if em_idx == 0:
             params["emotions"] = None
         elif em_idx == 1:
@@ -335,7 +352,7 @@ def _collect_m2_params() -> dict:
                     params["emotions"] = lst
                     break
 
-        params["noise"] = ["low","medium","high"][_choose(
+        params["noise"] = ["low", "medium", "high"][_choose(
             "Noise level", range(3),
             ["Low    – clean signal",
              "Medium – realistic (recommended)",
@@ -348,7 +365,7 @@ def _collect_m2_params() -> dict:
         seed_raw = _ask("Random seed  (0 = random each run)", "42")
         try:
             params["seed"] = int(seed_raw) or \
-                             __import__("random").randint(1, 999_999)
+                __import__("random").randint(1, 999_999)
         except ValueError:
             params["seed"] = 42
 
@@ -371,8 +388,8 @@ def _collect_m2_params() -> dict:
         params["max_dur"] = float(max_dur) if max_dur else None
 
     elif mode == "deployment":
-        params["source"]       = _browse_data_folder("deployment signal data")
-        params["user_id"]      = _ask("Participant ID  (can be anonymised)", "anon_001")
+        params["source"] = _browse_data_folder("deployment signal data")
+        params["user_id"] = _ask("Participant ID  (can be anonymised)", "anon_001")
         params["strip_labels"] = _ask_yn("Strip annotation columns?", True)
 
     return params
@@ -439,20 +456,20 @@ def _collect_m3_params(skip_source=False) -> dict:
             age = 10
         params["demographics"] = {
             "age": age,
-            "gender": ["Male","Female","Non-binary"][_choose(
-                "Gender", range(3), ["Male","Female","Non-binary"])],
+            "gender": ["Male", "Female", "Non-binary"][_choose(
+                "Gender", range(3), ["Male", "Female", "Non-binary"])],
             "ethnicity": [
-                "White British","Asian / Asian British",
-                "Black / African / Caribbean","Mixed / Multiple","Other",
+                "White British", "Asian / Asian British",
+                "Black / African / Caribbean", "Mixed / Multiple", "Other",
             ][_choose("Ethnicity", range(5),
-                ["White British","Asian / Asian British",
-                 "Black / African / Caribbean","Mixed / Multiple","Other"])],
-            "autism_severity": ["Low","Medium","Severe"][_choose(
+                      ["White British", "Asian / Asian British",
+                       "Black / African / Caribbean", "Mixed / Multiple", "Other"])],
+            "autism_severity": ["Low", "Medium", "Severe"][_choose(
                 "Autism severity  (DSM-5 Level)", range(3),
-                ["Low (Level 1)","Medium (Level 2)","Severe (Level 3)"])],
-            "verbal_status": ["Verbal","Minimally verbal","Non-verbal"][_choose(
+                ["Low (Level 1)", "Medium (Level 2)", "Severe (Level 3)"])],
+            "verbal_status": ["Verbal", "Minimally verbal", "Non-verbal"][_choose(
                 "Verbal status", range(3),
-                ["Verbal","Minimally verbal","Non-verbal"])],
+                ["Verbal", "Minimally verbal", "Non-verbal"])],
             "comorbidity": "Yes" if _ask_yn(
                 "Any co-occurring conditions?", True) else "No",
         }
@@ -466,13 +483,13 @@ def _collect_m3_params(skip_source=False) -> dict:
   Hampel only: Outlier removal only, no frequency filtering
   None:        Skip frequency filtering
 """)
-    filt_names = ["butterworth","kalman","hampel_only","none"]
-    filt_idx   = _choose("Filter type", range(4),
-                         ["Butterworth  (recommended)",
-                          "Kalman smoother",
-                          "Hampel outlier removal only",
-                          "No frequency filter"])
-    params["filter_type"]  = filt_names[filt_idx]
+    filt_names = ["butterworth", "kalman", "hampel_only", "none"]
+    filt_idx = _choose("Filter type", range(4),
+                       ["Butterworth  (recommended)",
+                        "Kalman smoother",
+                        "Hampel outlier removal only",
+                        "No frequency filter"])
+    params["filter_type"] = filt_names[filt_idx]
     params["apply_hampel"] = _ask_yn("Apply Hampel outlier pre-filter?", True)
 
     _section("⏱  Feature extraction window")
@@ -481,7 +498,7 @@ def _collect_m3_params(skip_source=False) -> dict:
   Shorter windows (30 s) suit real-time use but weaken HRV features.
 """)
     params["window_s"] = _ask_float("Window size (seconds)", 60.0, 10.0)
-    params["overlap"]  = _ask_float("Overlap fraction  (0.0–0.9)", 0.5, 0.0)
+    params["overlap"] = _ask_float("Overlap fraction  (0.0–0.9)", 0.5, 0.0)
     params["gen_plots"] = _ask_yn("Generate visualisation plots?", True)
     return params
 
@@ -499,10 +516,10 @@ def run_module_2(params: dict) -> list:
 
         acq = DataAcquisitionModule(
             mode={
-                "import":     "2.1",
-                "simulate":   "2.2",
-                "live_file":  "2.3",
-                "live_e4":    "2.3",
+                "import": "2.1",
+                "simulate": "2.2",
+                "live_file": "2.3",
+                "live_e4": "2.3",
                 "deployment": "2.4",
             }[mode],
             save_packets=True,
@@ -518,41 +535,41 @@ def run_module_2(params: dict) -> list:
 
         elif mode == "simulate":
             packets = acq.run_simulate(
-                duration_s       = params["duration_s"],
-                n_events         = params["n_events"],
-                event_duration_s = params["event_dur"],
-                emotions         = params.get("emotions"),
-                noise_level      = params["noise"],
-                seed             = params["seed"],
-                n_users          = params["n_users"],
-                shared_events    = params.get("shared_events", False),
-                save_m1a_output  = params.get("save_m1a", False),
+                duration_s=params["duration_s"],
+                n_events=params["n_events"],
+                event_duration_s=params["event_dur"],
+                emotions=params.get("emotions"),
+                noise_level=params["noise"],
+                seed=params["seed"],
+                n_users=params["n_users"],
+                shared_events=params.get("shared_events", False),
+                save_m1a_output=params.get("save_m1a", False),
             )
             return packets
 
         elif mode == "live_file":
             packet = acq.run_live_file(
-                csv_path       = params["source"],
-                user_id        = params.get("user_id", "participant_001"),
-                speed_factor   = params.get("speed", 10.0),
-                max_duration_s = params.get("max_dur"),
+                csv_path=params["source"],
+                user_id=params.get("user_id", "participant_001"),
+                speed_factor=params.get("speed", 10.0),
+                max_duration_s=params.get("max_dur"),
             )
             return [packet]
 
         elif mode == "live_e4":
             packet = acq.run_live_e4(
-                user_id        = params.get("user_id", "participant_001"),
-                host           = params.get("e4_host", "127.0.0.1"),
-                port           = params.get("e4_port", 28000),
-                max_duration_s = params.get("max_dur"),
+                user_id=params.get("user_id", "participant_001"),
+                host=params.get("e4_host", "127.0.0.1"),
+                port=params.get("e4_port", 28000),
+                max_duration_s=params.get("max_dur"),
             )
             return [packet]
 
         elif mode == "deployment":
             packet = acq.run_deployment(
-                source_path  = params["source"],
-                user_id      = params.get("user_id", "anon_001"),
-                strip_labels = params.get("strip_labels", True),
+                source_path=params["source"],
+                user_id=params.get("user_id", "anon_001"),
+                strip_labels=params.get("strip_labels", True),
             )
             return [packet]
 
@@ -565,9 +582,9 @@ def run_module_2(params: dict) -> list:
 
 def run_module_3(
     source,
-    params:       dict,
-    session_id:   str  = "pipeline_session",
-    user_id:      str  = "unknown",
+    params: dict,
+    session_id: str = "pipeline_session",
+    user_id: str = "unknown",
     demographics: dict = None,
 ) -> dict:
     """Execute Module 3 with isolated sys.path so M3's config.py is found."""
@@ -575,41 +592,39 @@ def run_module_3(
         from preprocessor import DataPreprocessor
 
         pp = DataPreprocessor(
-            filter_type    = params.get("filter_type",  "butterworth"),
-            apply_hampel   = params.get("apply_hampel", True),
-            window_s       = params.get("window_s",     60.0),
-            overlap        = params.get("overlap",      0.5),
-            generate_plots = params.get("gen_plots",    True),
-            verbose        = True,
+            filter_type=params.get("filter_type", "butterworth"),
+            apply_hampel=params.get("apply_hampel", True),
+            window_s=params.get("window_s", 60.0),
+            overlap=params.get("overlap", 0.5),
+            generate_plots=params.get("gen_plots", True),
+            verbose=True,
         )
         return pp.run(
-            signals_input = source,
-            demographics  = demographics or params.get("demographics"),
-            session_id    = session_id,
-            user_id       = user_id,
+            signals_input=source,
+            demographics=demographics or params.get("demographics"),
+            session_id=session_id,
+            user_id=user_id,
         )
-
 
 
 def run_module_4(
     source,
-    threshold_window_s:   float = 300.0,
+    threshold_window_s: float = 300.0,
     threshold_mad_factor: float = 3.0,
-    threshold_sustain_s:  float = 30.0,
-    session_id:           str   = "pipeline_session",
-    user_id:              str   = "unknown",
+    threshold_sustain_s: float = 30.0,
+    session_id: str = "pipeline_session",
+    user_id: str = "unknown",
 ) -> dict:
     """Execute Module 4 data analysis with isolated sys.path."""
     with _isolated_import(M4_DIR):
         from analyser import DataAnalyser
         da = DataAnalyser(
-            threshold_window_s   = threshold_window_s,
-            threshold_mad_factor = threshold_mad_factor,
-            threshold_sustain_s  = threshold_sustain_s,
-            verbose              = True,
+            threshold_window_s=threshold_window_s,
+            threshold_mad_factor=threshold_mad_factor,
+            threshold_sustain_s=threshold_sustain_s,
+            verbose=True,
         )
         return da.run(source=source, session_id=session_id, user_id=user_id)
-
 
 
 def _collect_m4_params() -> dict:
@@ -619,8 +634,8 @@ def _collect_m4_params() -> dict:
   Adaptive threshold flags sustained signal deviations from running median.
   Recommended: window=300s (5 min), N=3×MAD, sustain=30s.
 """)
-    win_s   = _ask_float("Threshold window (seconds)", 300.0, 30.0)
-    mad_n   = _ask_float("Deviation multiplier (N × MAD)", 3.0, 1.0)
+    win_s = _ask_float("Threshold window (seconds)", 300.0, 30.0)
+    mad_n = _ask_float("Deviation multiplier (N × MAD)", 3.0, 1.0)
     sustain = _ask_float("Minimum sustained duration (seconds)", 30.0, 1.0)
     return {"window_s": win_s, "mad_factor": mad_n, "sustain_s": sustain}
 
@@ -674,8 +689,8 @@ def run_full_pipeline():
             meta_user = packet.metadata.get("user", {})
             if meta_user:
                 dem = {k: meta_user[k]
-                       for k in ("age","gender","ethnicity","autism_severity",
-                                 "verbal_status","comorbidity")
+                       for k in ("age", "gender", "ethnicity", "autism_severity",
+                                 "verbal_status", "comorbidity")
                        if k in meta_user and meta_user[k] is not None}
 
         result = run_module_3(
@@ -703,18 +718,18 @@ def run_full_pipeline():
                 m4_sid = result["metadata"].get("session_id", "session_001")
                 print(f"\n  Analysing [{m4_uid}] ...")
                 run_module_4(
-                    source               = result["run_folder"],
-                    threshold_window_s   = m4_params["window_s"],
-                    threshold_mad_factor = m4_params["mad_factor"],
-                    threshold_sustain_s  = m4_params["sustain_s"],
-                    session_id           = m4_sid,
-                    user_id              = m4_uid,
+                    source=result["run_folder"],
+                    threshold_window_s=m4_params["window_s"],
+                    threshold_mad_factor=m4_params["mad_factor"],
+                    threshold_sustain_s=m4_params["sustain_s"],
+                    session_id=m4_sid,
+                    user_id=m4_uid,
                 )
 
     elapsed = time.time() - t_start
     _section(f"✅  Full Pipeline Complete  ({elapsed:.1f}s)")
     print(f"\n  Packets processed : {len(packets)}")
-    print(  "  M3 output folders :")
+    print("  M3 output folders :")
     for r in all_results:
         try:
             rel = r["run_folder"].relative_to(REPO_ROOT)
@@ -747,7 +762,7 @@ def run_preprocessing_standalone():
 
     t_start = time.time()
     m3_params = _collect_m3_params(skip_source=False)
-    source    = m3_params.pop("source", None)
+    source = m3_params.pop("source", None)
 
     if source is None or not Path(source).exists():
         print("  ✗  No valid source selected. Aborting.")
@@ -764,7 +779,7 @@ def run_preprocessing_standalone():
             f"Preprocess all {len(user_dirs)} users?  (No = select one)", True
         )
         targets = user_dirs if all_or_one else \
-                  [_browse_data_folder("user subfolder")]
+            [_browse_data_folder("user subfolder")]
     else:
         targets = [source]
 
@@ -773,7 +788,7 @@ def run_preprocessing_standalone():
         # Try to load demographics from metadata.json
         dem = m3_params.get("demographics")
         for meta_candidate in (target / "metadata.json",
-                               source   / "metadata.json"):
+                               source / "metadata.json"):
             if dem is None and meta_candidate.exists():
                 try:
                     with open(meta_candidate) as f:
@@ -781,8 +796,8 @@ def run_preprocessing_standalone():
                     user_meta = meta.get("user", {})
                     if user_meta:
                         dem = {k: user_meta[k]
-                               for k in ("age","gender","ethnicity",
-                                         "autism_severity","verbal_status",
+                               for k in ("age", "gender", "ethnicity",
+                                         "autism_severity", "verbal_status",
                                          "comorbidity")
                                if k in user_meta and user_meta[k] is not None}
                 except Exception:
@@ -809,7 +824,6 @@ def run_preprocessing_standalone():
     _pause()
 
 
-
 def run_analysis_standalone():
     """Run Module 4 independently on any existing Module 3 output."""
     _banner("Data Analysis  —  Module 4")
@@ -828,18 +842,18 @@ def run_analysis_standalone():
         print("  ✗  No valid source. Aborting.")
         return
 
-    m4_params  = _collect_m4_params()
+    m4_params = _collect_m4_params()
     session_id = _ask("Session ID", Path(source).name)
-    user_id    = _ask("User ID", "user_001")
+    user_id = _ask("User ID", "user_001")
 
     t0 = time.time()
     run_module_4(
-        source               = source,
-        threshold_window_s   = m4_params["window_s"],
-        threshold_mad_factor = m4_params["mad_factor"],
-        threshold_sustain_s  = m4_params["sustain_s"],
-        session_id           = session_id,
-        user_id              = user_id,
+        source=source,
+        threshold_window_s=m4_params["window_s"],
+        threshold_mad_factor=m4_params["mad_factor"],
+        threshold_sustain_s=m4_params["sustain_s"],
+        session_id=session_id,
+        user_id=user_id,
     )
     elapsed = time.time() - t0
     _section(f"✅  Analysis Complete  ({elapsed:.1f}s)")
@@ -879,7 +893,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--mode", default=None,
-                        choices=["full","preprocess","analyse","menu"])
+                        choices=["full", "preprocess", "analyse", "menu"])
     args, _ = parser.parse_known_args()
 
     if args.mode == "full":

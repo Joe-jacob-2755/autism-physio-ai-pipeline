@@ -28,40 +28,40 @@ from config import (
 
 # Physiological ranges for clipping detection
 PHYS_RANGES: dict = {
-    "EDA_uS":  (0.00,  50.0),
-    "BVP_nT":  (-500, 500.0),
-    "IBI_ms":  (200.0, 2500.0),
-    "ST_degC": (20.0,  42.0),
-    "ACC_X_g": (-8.0,   8.0),
-    "ACC_Y_g": (-8.0,   8.0),
-    "ACC_Z_g": (-8.0,   8.0),
+    "EDA_uS": (0.00, 50.0),
+    "BVP_nT": (-500, 500.0),
+    "IBI_ms": (200.0, 2500.0),
+    "ST_degC": (20.0, 42.0),
+    "ACC_X_g": (-8.0, 8.0),
+    "ACC_Y_g": (-8.0, 8.0),
+    "ACC_Z_g": (-8.0, 8.0),
 }
 
 
 @dataclass
 class CleaningReport:
     """Quality report for a single signal channel."""
-    signal_name:        str
+    signal_name: str
     n_samples_original: int
-    n_missing:          int
-    pct_missing:        float
-    n_out_of_range:     int
+    n_missing: int
+    pct_missing: float
+    n_out_of_range: int
     n_flatline_samples: int
-    discarded:          bool
-    fill_method:        str
-    notes:              List[str] = field(default_factory=list)
+    discarded: bool
+    fill_method: str
+    notes: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
-            "signal":             self.signal_name,
-            "n_samples":          self.n_samples_original,
-            "n_missing":          self.n_missing,
-            "pct_missing":        round(self.pct_missing * 100, 2),
-            "n_out_of_range":     self.n_out_of_range,
+            "signal": self.signal_name,
+            "n_samples": self.n_samples_original,
+            "n_missing": self.n_missing,
+            "pct_missing": round(self.pct_missing * 100, 2),
+            "n_out_of_range": self.n_out_of_range,
             "n_flatline_samples": self.n_flatline_samples,
-            "discarded":          self.discarded,
-            "fill_method":        self.fill_method,
-            "notes":              "; ".join(self.notes),
+            "discarded": self.discarded,
+            "fill_method": self.fill_method,
+            "notes": "; ".join(self.notes),
         }
 
 
@@ -81,12 +81,12 @@ class SignalCleaner:
     def __init__(
         self,
         discard_threshold: float = MISSING_DISCARD_THRESHOLD,
-        fill_method:       str   = MISSING_FILL_METHOD,
-        verbose:           bool  = True,
+        fill_method: str = MISSING_FILL_METHOD,
+        verbose: bool = True,
     ):
         self.discard_threshold = discard_threshold
-        self.fill_method       = fill_method
-        self.verbose           = verbose
+        self.fill_method = fill_method
+        self.verbose = verbose
 
     # ── Public API ─────────────────────────────────────────────────────────
 
@@ -116,7 +116,7 @@ class SignalCleaner:
                 self._log(
                     f"  [Cleaner] ✗ {name}: DISCARDED "
                     f"({report.pct_missing:.1f}% missing > "
-                    f"{self.discard_threshold*100:.0f}% threshold)"
+                    f"{self.discard_threshold * 100:.0f}% threshold)"
                 )
             else:
                 self._log(
@@ -134,7 +134,7 @@ class SignalCleaner:
     ) -> Tuple[pd.DataFrame, CleaningReport]:
         """Clean a single signal DataFrame."""
         df_work = df.copy()
-        notes   = []
+        notes = []
 
         # Identify value columns (not timestamp or annotation cols)
         val_cols = [c for c in df_work.columns
@@ -150,13 +150,13 @@ class SignalCleaner:
                 fill_method="none", notes=["No value columns found"]
             )
 
-        n_orig    = len(df_work)
+        n_orig = len(df_work)
         total_val = n_orig * len(val_cols)
 
         # ── Step 1: Count missing ─────────────────────────────────────
         missing_mask = df_work[val_cols].isnull().any(axis=1)
-        n_missing    = int(missing_mask.sum())
-        pct_missing  = n_missing / n_orig if n_orig > 0 else 0.0
+        n_missing = int(missing_mask.sum())
+        pct_missing = n_missing / n_orig if n_orig > 0 else 0.0
 
         # ── Step 2: Discard if > threshold ───────────────────────────
         if pct_missing > self.discard_threshold:
@@ -165,8 +165,8 @@ class SignalCleaner:
                 n_missing=n_missing, pct_missing=pct_missing,
                 n_out_of_range=0, n_flatline_samples=0,
                 discarded=True, fill_method="none",
-                notes=[f"Discarded: {pct_missing*100:.1f}% missing > "
-                       f"{self.discard_threshold*100:.0f}% threshold"]
+                notes=[f"Discarded: {pct_missing * 100:.1f}% missing > "
+                       f"{self.discard_threshold * 100:.0f}% threshold"]
             )
 
         # ── Step 3: Mark out-of-range as NaN ─────────────────────────
@@ -229,15 +229,15 @@ class SignalCleaner:
             notes.append(f"Residual {residual_nan} NaN → median-filled")
 
         report = CleaningReport(
-            signal_name        = signal_name,
-            n_samples_original = n_orig,
-            n_missing          = n_missing,
-            pct_missing        = pct_missing,
-            n_out_of_range     = n_oor,
-            n_flatline_samples = n_flatline,
-            discarded          = False,
-            fill_method        = self.fill_method,
-            notes              = notes,
+            signal_name=signal_name,
+            n_samples_original=n_orig,
+            n_missing=n_missing,
+            pct_missing=pct_missing,
+            n_out_of_range=n_oor,
+            n_flatline_samples=n_flatline,
+            discarded=False,
+            fill_method=self.fill_method,
+            notes=notes,
         )
         return df_work, report
 

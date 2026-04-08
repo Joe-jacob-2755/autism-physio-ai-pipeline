@@ -11,6 +11,10 @@ Two sets of visualisations:
 =============================================================================
 """
 from __future__ import annotations
+from config import SAMPLING_RATES, PLOT_DPI, PLOT_STYLE
+from matplotlib.gridspec import GridSpec
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 
 import numpy as np
 import pandas as pd
@@ -19,26 +23,22 @@ from typing import Dict, Optional
 
 import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-from matplotlib.gridspec import GridSpec
 
-from config import SAMPLING_RATES, PLOT_DPI, PLOT_STYLE
 
 # Signal display config
 SIG_COLORS = {
-    "EDA":   "#2ECC71", "BVP": "#E74C3C", "ST":    "#F39C12",
+    "EDA": "#2ECC71", "BVP": "#E74C3C", "ST": "#F39C12",
     "ACC_X": "#3498DB", "ACC_Y": "#9B59B6", "ACC_Z": "#1ABC9C",
-    "IBI":   "#E74C3C", "ACC":  "#3498DB",
+    "IBI": "#E74C3C", "ACC": "#3498DB",
 }
 SIG_YLABELS = {
-    "EDA":   "EDA (µS)",  "BVP":   "BVP (nT)", "IBI":  "IBI (ms)",
-    "ST":    "ST (°C)",   "ACC_X": "ACC X (g)", "ACC_Y": "ACC Y (g)",
-    "ACC_Z": "ACC Z (g)", "ACC":   "SVM (g)",
+    "EDA": "EDA (µS)", "BVP": "BVP (nT)", "IBI": "IBI (ms)",
+    "ST": "ST (°C)", "ACC_X": "ACC X (g)", "ACC_Y": "ACC Y (g)",
+    "ACC_Z": "ACC Z (g)", "ACC": "SVM (g)",
 }
 VALUE_COLS = {
     "EDA": "EDA_uS", "BVP": "BVP_nT", "IBI": "IBI_ms",
-    "ST":  "ST_degC", "ACC_X": "ACC_X_g", "ACC_Y": "ACC_Y_g",
+    "ST": "ST_degC", "ACC_X": "ACC_X_g", "ACC_Y": "ACC_Y_g",
     "ACC_Z": "ACC_Z_g",
 }
 
@@ -61,7 +61,7 @@ def _shade_labels(ax, df, t_col, duration):
         "Tired": "#708090", "baseline": None,
     }
     labels = df["target_label"].values
-    ts     = df[t_col].values if t_col in df.columns else np.arange(len(labels))
+    ts = df[t_col].values if t_col in df.columns else np.arange(len(labels))
 
     i = 0
     while i < len(labels):
@@ -105,9 +105,9 @@ class PreprocessingVisualiser:
 
     def plot_processed_signals(
         self,
-        signals:    Dict[str, pd.DataFrame],
+        signals: Dict[str, pd.DataFrame],
         session_id: str = "",
-        user_id:    str = "",
+        user_id: str = "",
     ) -> Dict[str, Path]:
         """
         One figure per processed signal channel with event shading.
@@ -117,7 +117,7 @@ class PreprocessingVisualiser:
 
         for sig_name, df in signals.items():
             path = self._plot_one_processed(df, sig_name,
-                                             session_id, user_id)
+                                            session_id, user_id)
             if path:
                 saved[sig_name] = path
 
@@ -134,8 +134,8 @@ class PreprocessingVisualiser:
             return None
 
         t_col = "timestamp_s" if "timestamp_s" in df.columns else None
-        t     = df[t_col].values if t_col else np.arange(len(df))
-        vals  = df[val_col].values
+        t = df[t_col].values if t_col else np.arange(len(df))
+        vals = df[val_col].values
 
         fig, (ax_tl, ax_sig) = plt.subplots(
             2, 1, figsize=(14, 5.5),
@@ -147,7 +147,7 @@ class PreprocessingVisualiser:
 
         # Signal
         color = SIG_COLORS.get(sig_name, "#555555")
-        ds    = 4 if sig_name == "BVP" else (2 if "ACC" in sig_name else 1)
+        ds = 4 if sig_name == "BVP" else (2 if "ACC" in sig_name else 1)
         ax_sig.plot(t[::ds], vals[::ds], color=color, lw=0.75, alpha=0.9)
         ax_sig.set_ylabel(SIG_YLABELS.get(sig_name, sig_name), fontsize=9)
         ax_sig.set_xlabel("Time (s)", fontsize=9)
@@ -165,15 +165,15 @@ class PreprocessingVisualiser:
         return out_path
 
     def _plot_combined_processed(self, signals, session_id, user_id) -> Optional[Path]:
-        order = [s for s in ("EDA","BVP","IBI","ST","ACC_X","ACC_Y","ACC_Z")
+        order = [s for s in ("EDA", "BVP", "IBI", "ST", "ACC_X", "ACC_Y", "ACC_Z")
                  if s in signals]
         if not order:
             return None
 
         fig = plt.figure(figsize=(16, 3.5 * len(order) + 2))
         heights = [1] + [3] * len(order)
-        gs  = GridSpec(len(order) + 1, 1, figure=fig,
-                       height_ratios=heights, hspace=0.35)
+        gs = GridSpec(len(order) + 1, 1, figure=fig,
+                      height_ratios=heights, hspace=0.35)
 
         # Title
         fig.suptitle(
@@ -186,21 +186,21 @@ class PreprocessingVisualiser:
         ax_tl = fig.add_subplot(gs[0])
         first_df = signals[order[0]]
         t0 = first_df["timestamp_s"].values if "timestamp_s" in first_df.columns \
-             else np.arange(len(first_df))
+            else np.arange(len(first_df))
         self._draw_timeline(ax_tl, first_df, t0, session_id, user_id,
                             "All signals")
 
         for i, sig_name in enumerate(order):
-            df  = signals[sig_name]
-            ax  = fig.add_subplot(gs[i + 1])
+            df = signals[sig_name]
+            ax = fig.add_subplot(gs[i + 1])
             val_col = self._get_val_col(df, sig_name)
             if val_col is None:
                 continue
             t_col = "timestamp_s" if "timestamp_s" in df.columns else None
-            t     = df[t_col].values if t_col else np.arange(len(df))
-            vals  = df[val_col].values
+            t = df[t_col].values if t_col else np.arange(len(df))
+            vals = df[val_col].values
             color = SIG_COLORS.get(sig_name, "#555555")
-            ds    = 4 if sig_name == "BVP" else 1
+            ds = 4 if sig_name == "BVP" else 1
             ax.plot(t[::ds], vals[::ds], color=color, lw=0.7)
             ax.set_ylabel(SIG_YLABELS.get(sig_name, sig_name), fontsize=8)
             ax.set_xlim(t[0], t[-1])
@@ -222,10 +222,10 @@ class PreprocessingVisualiser:
 
     def plot_raw_vs_processed(
         self,
-        raw_signals:       Dict[str, pd.DataFrame],
+        raw_signals: Dict[str, pd.DataFrame],
         processed_signals: Dict[str, pd.DataFrame],
-        session_id:        str = "",
-        user_id:           str = "",
+        session_id: str = "",
+        user_id: str = "",
     ) -> Dict[str, Path]:
         """
         Side-by-side (or overlay) comparison of raw and processed signals.
@@ -253,15 +253,15 @@ class PreprocessingVisualiser:
         return saved
 
     def _plot_comparison_one(self, raw_df, proc_df, sig_name,
-                              session_id, user_id) -> Optional[Path]:
+                             session_id, user_id) -> Optional[Path]:
         val_col = self._get_val_col(raw_df, sig_name)
         if val_col is None or val_col not in proc_df.columns:
             return None
 
         t_col = "timestamp_s"
-        t_raw  = raw_df[t_col].values  if t_col in raw_df.columns  else np.arange(len(raw_df))
+        t_raw = raw_df[t_col].values if t_col in raw_df.columns else np.arange(len(raw_df))
         t_proc = proc_df[t_col].values if t_col in proc_df.columns else np.arange(len(proc_df))
-        raw  = raw_df[val_col].values
+        raw = raw_df[val_col].values
         proc = proc_df[val_col].values
 
         fig, axes = plt.subplots(3, 1, figsize=(14, 9),
@@ -272,10 +272,10 @@ class PreprocessingVisualiser:
 
         # Raw
         color = SIG_COLORS.get(sig_name, "#555555")
-        ds    = 4 if sig_name == "BVP" else 1
+        ds = 4 if sig_name == "BVP" else 1
         axes[1].plot(t_raw[::ds], raw[::ds], color="#AAAAAA", lw=0.6,
                      alpha=0.8, label="Raw")
-        axes[1].set_ylabel(f"{SIG_YLABELS.get(sig_name,sig_name)}\n(raw)", fontsize=9)
+        axes[1].set_ylabel(f"{SIG_YLABELS.get(sig_name, sig_name)}\n(raw)", fontsize=9)
         axes[1].set_xlim(t_raw[0], t_raw[-1])
         axes[1].set_xticklabels([])
         axes[1].legend(fontsize=8, loc="upper right")
@@ -283,7 +283,7 @@ class PreprocessingVisualiser:
         # Processed
         axes[2].plot(t_proc[::ds], proc[::ds], color=color, lw=0.75,
                      alpha=0.9, label="Processed")
-        axes[2].set_ylabel(f"{SIG_YLABELS.get(sig_name,sig_name)}\n(processed)", fontsize=9)
+        axes[2].set_ylabel(f"{SIG_YLABELS.get(sig_name, sig_name)}\n(processed)", fontsize=9)
         axes[2].set_xlabel("Time (s)", fontsize=9)
         axes[2].set_xlim(t_proc[0], t_proc[-1])
         axes[2].legend(fontsize=8, loc="upper right")
@@ -291,7 +291,7 @@ class PreprocessingVisualiser:
 
         # Add noise stats annotation
         if len(raw) > 4 and len(proc) > 4:
-            raw_std  = np.std(raw)
+            raw_std = np.std(raw)
             proc_std = np.std(proc)
             snr_gain = 20 * np.log10(raw_std / (proc_std + 1e-12))
             axes[1].set_title(
@@ -312,8 +312,8 @@ class PreprocessingVisualiser:
         return out_path
 
     def _plot_comparison_combined(self, raw_signals, processed_signals,
-                                   session_id, user_id) -> Optional[Path]:
-        common = [s for s in ("EDA","BVP","ST","ACC_X","ACC_Y","ACC_Z")
+                                  session_id, user_id) -> Optional[Path]:
+        common = [s for s in ("EDA", "BVP", "ST", "ACC_X", "ACC_Y", "ACC_Z")
                   if s in raw_signals and s in processed_signals]
         if not common:
             return None
@@ -321,7 +321,7 @@ class PreprocessingVisualiser:
         ncols = 2
         nrows = len(common)
         fig, axes = plt.subplots(nrows, ncols, figsize=(16, 3.5 * nrows),
-                                  sharex="row")
+                                 sharex="row")
         fig.suptitle(
             f"Raw vs Processed — Session: {session_id}  User: {user_id}",
             fontsize=13, fontweight="bold",
@@ -332,17 +332,17 @@ class PreprocessingVisualiser:
             if val_col is None:
                 continue
             t_col = "timestamp_s"
-            t_raw  = raw_signals[sig_name][t_col].values  \
-                     if t_col in raw_signals[sig_name].columns \
-                     else np.arange(len(raw_signals[sig_name]))
+            t_raw = raw_signals[sig_name][t_col].values  \
+                if t_col in raw_signals[sig_name].columns \
+                else np.arange(len(raw_signals[sig_name]))
             t_proc = processed_signals[sig_name][t_col].values \
-                     if t_col in processed_signals[sig_name].columns \
-                     else np.arange(len(processed_signals[sig_name]))
+                if t_col in processed_signals[sig_name].columns \
+                else np.arange(len(processed_signals[sig_name]))
 
-            raw  = raw_signals[sig_name][val_col].values
+            raw = raw_signals[sig_name][val_col].values
             proc = processed_signals[sig_name][val_col].values
             color = SIG_COLORS.get(sig_name, "#555555")
-            ds    = 4 if sig_name == "BVP" else 1
+            ds = 4 if sig_name == "BVP" else 1
             ylabel = SIG_YLABELS.get(sig_name, sig_name)
 
             # Left: raw
@@ -419,7 +419,7 @@ class PreprocessingVisualiser:
         """Return the value column name for a signal DataFrame."""
         candidates = {
             "EDA": "EDA_uS", "BVP": "BVP_nT", "IBI": "IBI_ms",
-            "ST":  "ST_degC", "ACC_X": "ACC_X_g",
+            "ST": "ST_degC", "ACC_X": "ACC_X_g",
             "ACC_Y": "ACC_Y_g", "ACC_Z": "ACC_Z_g",
             "ACC": "ACC_X_g",
         }

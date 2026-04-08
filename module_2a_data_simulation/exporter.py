@@ -46,7 +46,7 @@ class DataExporter:
     """
 
     def __init__(self, result: SimulationResult, output_dir: str = "output"):
-        self.result     = result
+        self.result = result
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -77,16 +77,16 @@ class DataExporter:
         Each timestamp is compared against the scheduled event windows.
         Timestamps outside all events receive label='baseline', event_id=0.
         """
-        n      = len(timestamps)
+        n = len(timestamps)
         labels = np.full(n, "baseline", dtype=object)
         ev_ids = np.zeros(n, dtype=int)
-        cats   = np.full(n, "baseline", dtype=object)
+        cats = np.full(n, "baseline", dtype=object)
 
         for i, ev in enumerate(self.result.events):
             mask = (timestamps >= ev.start_s) & (timestamps < ev.end_s)
             labels[mask] = ev.emotion
             ev_ids[mask] = i + 1
-            cats[mask]   = ev.profile["category"]
+            cats[mask] = ev.profile["category"]
 
         return labels, ev_ids, cats
 
@@ -99,63 +99,63 @@ class DataExporter:
         Schema for every CSV:
           timestamp_s  | <signal_col(s)> | target_label | event_id | category
         """
-        r     = self.result
+        r = self.result
         saved: Dict[str, Path] = {}
 
         # ── EDA  (4 Hz) ───────────────────────────────────────────────────
         ts = r.time_vectors["EDA"]
         lbl, eid, cat = self._labels_for_timestamps(ts)
         saved["EDA"] = self._write_df(pd.DataFrame({
-            "timestamp_s":  np.round(ts, 4),
-            "EDA_uS":       r.signals["EDA"],
+            "timestamp_s": np.round(ts, 4),
+            "EDA_uS": r.signals["EDA"],
             "target_label": lbl,
-            "event_id":     eid,
-            "category":     cat,
+            "event_id": eid,
+            "category": cat,
         }), "EDA.csv")
 
         # ── BVP  (64 Hz) ──────────────────────────────────────────────────
         ts = r.time_vectors["BVP"]
         lbl, eid, cat = self._labels_for_timestamps(ts)
         saved["BVP"] = self._write_df(pd.DataFrame({
-            "timestamp_s":  np.round(ts, 5),
-            "BVP_nT":       r.signals["BVP"],
+            "timestamp_s": np.round(ts, 5),
+            "BVP_nT": r.signals["BVP"],
             "target_label": lbl,
-            "event_id":     eid,
-            "category":     cat,
+            "event_id": eid,
+            "category": cat,
         }), "BVP.csv")
 
         # ── IBI  (event-based — one row per heartbeat) ────────────────────
         lbl, eid, cat = self._labels_for_timestamps(r.ibi_times_s)
         saved["IBI"] = self._write_df(pd.DataFrame({
-            "timestamp_s":  np.round(r.ibi_times_s, 5),
-            "IBI_ms":       r.ibi_values_ms,
+            "timestamp_s": np.round(r.ibi_times_s, 5),
+            "IBI_ms": r.ibi_values_ms,
             "target_label": lbl,
-            "event_id":     eid,
-            "category":     cat,
+            "event_id": eid,
+            "category": cat,
         }), "IBI.csv")
 
         # ── ST  (4 Hz) ────────────────────────────────────────────────────
         ts = r.time_vectors["ST"]
         lbl, eid, cat = self._labels_for_timestamps(ts)
         saved["ST"] = self._write_df(pd.DataFrame({
-            "timestamp_s":  np.round(ts, 4),
-            "ST_degC":      r.signals["ST"],
+            "timestamp_s": np.round(ts, 4),
+            "ST_degC": r.signals["ST"],
             "target_label": lbl,
-            "event_id":     eid,
-            "category":     cat,
+            "event_id": eid,
+            "category": cat,
         }), "ST.csv")
 
         # ── ACC  (32 Hz — all three axes in one file) ─────────────────────
         ts = r.time_vectors["ACC_X"]
         lbl, eid, cat = self._labels_for_timestamps(ts)
         saved["ACC"] = self._write_df(pd.DataFrame({
-            "timestamp_s":  np.round(ts, 5),
-            "ACC_X_g":      r.signals["ACC_X"],
-            "ACC_Y_g":      r.signals["ACC_Y"],
-            "ACC_Z_g":      r.signals["ACC_Z"],
+            "timestamp_s": np.round(ts, 5),
+            "ACC_X_g": r.signals["ACC_X"],
+            "ACC_Y_g": r.signals["ACC_Y"],
+            "ACC_Z_g": r.signals["ACC_Z"],
             "target_label": lbl,
-            "event_id":     eid,
-            "category":     cat,
+            "event_id": eid,
+            "category": cat,
         }), "ACC.csv")
 
         return saved
@@ -168,26 +168,26 @@ class DataExporter:
         Lower-rate signals are linearly interpolated.
         IBI appears as a sparse column (NaN between beats).
         """
-        r      = self.result
+        r = self.result
         fs_ref = SAMPLING_RATES["BVP"]
-        n_ref  = len(r.signals["BVP"])
-        t_ref  = r.time_vectors["BVP"]
+        n_ref = len(r.signals["BVP"])
+        t_ref = r.time_vectors["BVP"]
 
         # Target labels at 64 Hz
         lbl, eid, cat = self._labels_for_timestamps(t_ref)
 
         df = pd.DataFrame({
-            "timestamp_s":  np.round(t_ref, 5),
-            "BVP_nT":       r.signals["BVP"],
+            "timestamp_s": np.round(t_ref, 5),
+            "BVP_nT": r.signals["BVP"],
             "target_label": lbl,
-            "event_id":     eid,
-            "category":     cat,
+            "event_id": eid,
+            "category": cat,
         })
 
         # Interpolate slower signals onto 64 Hz grid
-        for sig_name, col in [("EDA","EDA_uS"), ("ST","ST_degC"),
-                               ("ACC_X","ACC_X_g"), ("ACC_Y","ACC_Y_g"),
-                               ("ACC_Z","ACC_Z_g")]:
+        for sig_name, col in [("EDA", "EDA_uS"), ("ST", "ST_degC"),
+                              ("ACC_X", "ACC_X_g"), ("ACC_Y", "ACC_Y_g"),
+                              ("ACC_Z", "ACC_Z_g")]:
             interp = interp1d(
                 r.time_vectors[sig_name], r.signals[sig_name],
                 kind="linear", bounds_error=False, fill_value="extrapolate",
@@ -215,10 +215,10 @@ class DataExporter:
     def export_annotations(self) -> Dict[str, Path]:
         saved: Dict[str, Path] = {}
         mapping = {
-            "events":         "annotations_events.csv",
-            "baseline_wins":  "annotations_baseline_windows.csv",
+            "events": "annotations_events.csv",
+            "baseline_wins": "annotations_baseline_windows.csv",
             "signal_quality": "annotations_signal_quality.csv",
-            "sample_labels":  "annotations_sample_labels.csv",
+            "sample_labels": "annotations_sample_labels.csv",
         }
         for key, filename in mapping.items():
             ann = self.result.annotations
@@ -232,11 +232,11 @@ class DataExporter:
         meta = dict(self.result.metadata)
         meta["events"] = [
             {
-                "event_id":   i + 1,
-                "emotion":    ev.emotion,
-                "category":   ev.profile["category"],
-                "start_s":    round(ev.start_s, 3),
-                "end_s":      round(ev.end_s, 3),
+                "event_id": i + 1,
+                "emotion": ev.emotion,
+                "category": ev.profile["category"],
+                "start_s": round(ev.start_s, 3),
+                "end_s": round(ev.end_s, 3),
                 "duration_s": round(ev.duration_s, 3),
             }
             for i, ev in enumerate(self.result.events)
@@ -244,10 +244,10 @@ class DataExporter:
         meta["signal_stats"] = {
             name: {
                 "n_samples": int(len(arr)),
-                "mean":  round(float(np.mean(arr)), 4),
-                "std":   round(float(np.std(arr)),  4),
-                "min":   round(float(np.min(arr)),  4),
-                "max":   round(float(np.max(arr)),  4),
+                "mean": round(float(np.mean(arr)), 4),
+                "std": round(float(np.std(arr)), 4),
+                "min": round(float(np.min(arr)), 4),
+                "max": round(float(np.max(arr)), 4),
             }
             for name, arr in self.result.signals.items()
         }
@@ -293,23 +293,23 @@ def export_all_users_combined(
         import numpy as _np
 
         fs_ref = SAMPLING_RATES["BVP"]
-        t_ref  = result.time_vectors["BVP"]
-        n_ref  = len(result.signals["BVP"])
+        t_ref = result.time_vectors["BVP"]
+        n_ref = len(result.signals["BVP"])
 
         lbl, eid, cat = DataExporter(result)._labels_for_timestamps(t_ref)
 
         df = pd.DataFrame({
-            "user_id":      uid,
-            "timestamp_s":  _np.round(t_ref, 5),
+            "user_id": uid,
+            "timestamp_s": _np.round(t_ref, 5),
             "target_label": lbl,
-            "event_id":     eid,
-            "category":     cat,
-            "BVP_nT":       result.signals["BVP"],
+            "event_id": eid,
+            "category": cat,
+            "BVP_nT": result.signals["BVP"],
         })
 
-        for sig_name, col in [("EDA","EDA_uS"), ("ST","ST_degC"),
-                               ("ACC_X","ACC_X_g"), ("ACC_Y","ACC_Y_g"),
-                               ("ACC_Z","ACC_Z_g")]:
+        for sig_name, col in [("EDA", "EDA_uS"), ("ST", "ST_degC"),
+                              ("ACC_X", "ACC_X_g"), ("ACC_Y", "ACC_Y_g"),
+                              ("ACC_Z", "ACC_Z_g")]:
             interp = _interp1d(
                 result.time_vectors[sig_name], result.signals[sig_name],
                 kind="linear", bounds_error=False, fill_value="extrapolate")
@@ -333,30 +333,30 @@ def export_all_users_combined(
     # ── Run summary ───────────────────────────────────────────────────────────
     summary_rows = []
     for result in results:
-        up  = result.user_profile
+        up = result.user_profile
         row = {
-            "user_id":          up.user_id if up else "user_001",
-            "n_events":         len(result.events),
-            "emotions":         ", ".join(ev.emotion for ev in result.events),
-            "duration_s":       result.duration_s,
-            "noise_level":      result.metadata.get("noise_level"),
-            "seed":             result.metadata.get("seed"),
+            "user_id": up.user_id if up else "user_001",
+            "n_events": len(result.events),
+            "emotions": ", ".join(ev.emotion for ev in result.events),
+            "duration_s": result.duration_s,
+            "noise_level": result.metadata.get("noise_level"),
+            "seed": result.metadata.get("seed"),
         }
         if up:
             row.update({
-                "eda_tonic_mean":   round(up.eda_tonic_mean, 3),
-                "hr_resting":       round(up.hr_resting, 1),
-                "hrv_sdnn":         round(up.hrv_sdnn, 1),
-                "st_baseline":      round(up.st_baseline, 2),
-                "eda_reactivity":   round(up.eda_reactivity, 3),
-                "hr_reactivity":    round(up.hr_reactivity, 3),
-                "movement_scale":   round(up.movement_scale, 3),
+                "eda_tonic_mean": round(up.eda_tonic_mean, 3),
+                "hr_resting": round(up.hr_resting, 1),
+                "hrv_sdnn": round(up.hrv_sdnn, 1),
+                "st_baseline": round(up.st_baseline, 2),
+                "eda_reactivity": round(up.eda_reactivity, 3),
+                "hr_reactivity": round(up.hr_reactivity, 3),
+                "movement_scale": round(up.movement_scale, 3),
                 "reactivity_class": up.reactivity_class,
             })
         summary_rows.append(row)
 
     summary_df = pd.DataFrame(summary_rows)
-    sum_path   = Path(run_folder) / "run_summary.csv"
+    sum_path = Path(run_folder) / "run_summary.csv"
     summary_df.to_csv(sum_path, index=False)
     print(f"  [Exporter] Saved run_summary.csv  ({len(summary_df)} users)")
 

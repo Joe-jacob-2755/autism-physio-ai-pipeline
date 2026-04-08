@@ -67,9 +67,9 @@ from pipeline_packet import (
 # CONSTANTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-DEVICE_FILE_STREAM  = "file_stream"
-DEVICE_EMPATICA_E4  = "empatica_e4"
-DEVICE_MANUAL       = "manual"
+DEVICE_FILE_STREAM = "file_stream"
+DEVICE_EMPATICA_E4 = "empatica_e4"
+DEVICE_MANUAL = "manual"
 
 SAMPLING_RATES = {
     "EDA": 4, "BVP": 64, "IBI": None, "ST": 4,
@@ -92,10 +92,10 @@ except ImportError:
 @dataclass
 class LiveEvent:
     """A researcher-annotated event during a live recording."""
-    emotion:    str
-    start_s:    float
-    end_s:      Optional[float] = None   # None = event still active
-    category:   str             = ""
+    emotion: str
+    start_s: float
+    end_s: Optional[float] = None   # None = event still active
+    category: str = ""
 
     def close(self, end_s: float):
         self.end_s = end_s
@@ -112,10 +112,10 @@ class LiveEvent:
 
     def to_dict(self) -> dict:
         return {
-            "emotion":    self.emotion,
-            "category":   self.category,
-            "start_s":    round(self.start_s, 3),
-            "end_s":      round(self.end_s, 3) if self.end_s else None,
+            "emotion": self.emotion,
+            "category": self.category,
+            "start_s": round(self.start_s, 3),
+            "end_s": round(self.end_s, 3) if self.end_s else None,
             "duration_s": self.duration_s,
         }
 
@@ -132,10 +132,10 @@ class StreamBuffer:
     """
 
     def __init__(self, name: str):
-        self.name     = name
-        self._times:  list = []
+        self.name = name
+        self._times: list = []
         self._values: list = []
-        self._lock    = threading.Lock()
+        self._lock = threading.Lock()
 
     def append(self, timestamp_s: float, value):
         with self._lock:
@@ -198,11 +198,11 @@ class FileStreamAdapter(DeviceAdapter):
     """
 
     def __init__(self, csv_path: str | Path, speed_factor: float = 10.0):
-        self.csv_path     = Path(csv_path)
+        self.csv_path = Path(csv_path)
         self.speed_factor = speed_factor
-        self._thread:  Optional[threading.Thread] = None
+        self._thread: Optional[threading.Thread] = None
         self._stop_evt = threading.Event()
-        self._df:      Optional[pd.DataFrame] = None
+        self._df: Optional[pd.DataFrame] = None
 
     def connect(self):
         if not self.csv_path.exists():
@@ -221,24 +221,24 @@ class FileStreamAdapter(DeviceAdapter):
         self._thread.start()
 
     def _stream_loop(self, buffers: Dict[str, StreamBuffer]):
-        df       = self._df
-        t_start  = time.time()
-        prev_ts  = 0.0
+        df = self._df
+        t_start = time.time()
+        prev_ts = 0.0
 
         col_map = {
-            "EDA":   ("EDA_uS",),
-            "BVP":   ("BVP_nT",),
-            "IBI":   ("IBI_ms",),
-            "ST":    ("ST_degC",),
-            "ACC":   ("ACC_X_g", "ACC_Y_g", "ACC_Z_g"),
+            "EDA": ("EDA_uS",),
+            "BVP": ("BVP_nT",),
+            "IBI": ("IBI_ms",),
+            "ST": ("ST_degC",),
+            "ACC": ("ACC_X_g", "ACC_Y_g", "ACC_Z_g"),
         }
 
         for _, row in df.iterrows():
             if self._stop_evt.is_set():
                 break
 
-            ts  = float(row["timestamp_s"])
-            dt  = (ts - prev_ts) / self.speed_factor
+            ts = float(row["timestamp_s"])
+            dt = (ts - prev_ts) / self.speed_factor
             if dt > 0:
                 time.sleep(max(0, dt))
             prev_ts = ts
@@ -269,9 +269,9 @@ class FileStreamAdapter(DeviceAdapter):
     @property
     def device_info(self) -> dict:
         return {
-            "device_type":   DEVICE_FILE_STREAM,
-            "source_file":   str(self.csv_path),
-            "speed_factor":  self.speed_factor,
+            "device_type": DEVICE_FILE_STREAM,
+            "source_file": str(self.csv_path),
+            "speed_factor": self.speed_factor,
         }
 
 
@@ -291,11 +291,11 @@ class EmpaticaE4Adapter(DeviceAdapter):
     """
 
     def __init__(self, host: str = "127.0.0.1", port: int = 28000):
-        self.host    = host
-        self.port    = port
-        self._sock   = None
+        self.host = host
+        self.port = port
+        self._sock = None
         self._thread = None
-        self._stop   = threading.Event()
+        self._stop = threading.Event()
 
     def connect(self):
         import socket
@@ -338,7 +338,7 @@ class EmpaticaE4Adapter(DeviceAdapter):
     def _recv_loop(self, buffers: Dict[str, StreamBuffer]):
         """Parse E4 Streaming Server messages and route to buffers."""
         buf = ""
-        t0  = time.time()
+        t0 = time.time()
 
         while not self._stop.is_set():
             try:
@@ -361,7 +361,7 @@ class EmpaticaE4Adapter(DeviceAdapter):
         if len(parts) < 3:
             return
         stream = parts[0]
-        ts     = float(parts[1]) - t0
+        ts = float(parts[1]) - t0
 
         try:
             if stream == "E4_Gsr" and "EDA" in buffers:
@@ -409,10 +409,10 @@ class SessionAnnotator:
     """
 
     def __init__(self, session_start_time: float):
-        self.t0     = session_start_time
+        self.t0 = session_start_time
         self.events: List[LiveEvent] = []
-        self._open:  Optional[LiveEvent] = None
-        self._lock   = threading.Lock()
+        self._open: Optional[LiveEvent] = None
+        self._lock = threading.Lock()
 
     def elapsed(self) -> float:
         return time.time() - self.t0
@@ -428,11 +428,11 @@ class SessionAnnotator:
                 self._open.close(self.elapsed())
 
             cat = "physiological_need" if emotion in [
-                "Hunger","Thirst","Toilet","Tired"] else "affective"
+                "Hunger", "Thirst", "Toilet", "Tired"] else "affective"
             ev = LiveEvent(
-                emotion  = emotion,
-                start_s  = self.elapsed(),
-                category = cat,
+                emotion=emotion,
+                start_s=self.elapsed(),
+                category=cat,
             )
             self.events.append(ev)
             self._open = ev
@@ -494,15 +494,15 @@ class LiveDataCollector:
     def __init__(
         self,
         device_adapter: DeviceAdapter,
-        user_id:        str            = "live_participant",
-        max_duration_s: Optional[float]= None,
-        verbose:        bool           = True,
+        user_id: str = "live_participant",
+        max_duration_s: Optional[float] = None,
+        verbose: bool = True,
     ):
-        self.adapter        = device_adapter
-        self.user_id        = user_id
+        self.adapter = device_adapter
+        self.user_id = user_id
         self.max_duration_s = max_duration_s
-        self.verbose        = verbose
-        self.session_id     = _new_session_id("LIV")
+        self.verbose = verbose
+        self.session_id = _new_session_id("LIV")
 
         # Buffers — one per channel
         self.buffers: Dict[str, StreamBuffer] = {
@@ -510,7 +510,7 @@ class LiveDataCollector:
             for name in ("EDA", "BVP", "IBI", "ST", "ACC")
         }
         self._annotator: Optional[SessionAnnotator] = None
-        self._t_start:   Optional[float] = None
+        self._t_start: Optional[float] = None
 
     # ── Run session ───────────────────────────────────────────────────────
 
@@ -579,8 +579,8 @@ class LiveDataCollector:
                 continue
 
             parts = raw.lower().split(maxsplit=1)
-            cmd   = parts[0]
-            arg   = parts[1] if len(parts) > 1 else ""
+            cmd = parts[0]
+            arg = parts[1] if len(parts) > 1 else ""
 
             if cmd == "stop":
                 stop_evt.set()
@@ -598,19 +598,19 @@ class LiveDataCollector:
                 print(f"  Emotions: {', '.join(EMOTIONS_ALL)}")
             else:
                 elapsed = self._annotator.elapsed()
-                n_eda   = len(self.buffers["EDA"])
-                n_bvp   = len(self.buffers["BVP"])
+                n_eda = len(self.buffers["EDA"])
+                n_bvp = len(self.buffers["BVP"])
                 print(f"  Unknown command '{cmd}'. "
                       f"[t={elapsed:.1f}s | EDA={n_eda} | BVP={n_bvp} samples]")
 
     # ── Build PipelinePacket from buffers ─────────────────────────────────
 
     def _build_packet(self, duration_s: float) -> PipelinePacket:
-        events     = self._annotator.get_events()
+        events = self._annotator.get_events()
         is_annotated = len(events) > 0
 
         def _labels(timestamps):
-            n   = len(timestamps)
+            n = len(timestamps)
             lbl = np.full(n, "baseline", dtype=object)
             eid = np.zeros(n, dtype=int)
             cat = np.full(n, "baseline", dtype=object)
@@ -658,22 +658,22 @@ class LiveDataCollector:
         combined = self._build_combined(signals, duration_s, _labels)
 
         extra = {
-            "device_info":    self.adapter.device_info,
-            "duration_s":     round(duration_s, 2),
-            "is_annotated":   is_annotated,
-            "n_events":       len(events),
-            "events":         [ev.to_dict() for ev in events],
-            "recorded_at":    datetime.now().isoformat(),
+            "device_info": self.adapter.device_info,
+            "duration_s": round(duration_s, 2),
+            "is_annotated": is_annotated,
+            "n_events": len(events),
+            "events": [ev.to_dict() for ev in events],
+            "recorded_at": datetime.now().isoformat(),
         }
 
         return build_packet_from_dataframes(
-            signals      = signals,
-            combined     = combined,
-            source_type  = SOURCE_LIVE,
-            is_annotated = is_annotated,
-            user_id      = self.user_id,
-            session_id   = self.session_id,
-            extra_meta   = extra,
+            signals=signals,
+            combined=combined,
+            source_type=SOURCE_LIVE,
+            is_annotated=is_annotated,
+            user_id=self.user_id,
+            session_id=self.session_id,
+            extra_meta=extra,
         )
 
     def _build_combined(self, signals, duration_s, label_fn):
@@ -688,10 +688,10 @@ class LiveDataCollector:
         else:
             ref_df = signals["BVP"]
 
-        t_ref  = ref_df["timestamp_s"].values
+        t_ref = ref_df["timestamp_s"].values
         l, e, c = label_fn(t_ref)
         combined = pd.DataFrame({
-            "timestamp_s":  t_ref,
+            "timestamp_s": t_ref,
             "target_label": l, "event_id": e, "category": c,
         })
 
@@ -699,7 +699,7 @@ class LiveDataCollector:
                    "IBI": "IBI_ms", "ST": "ST_degC"}
         for sn, col in col_map.items():
             if sn in signals and col in signals[sn].columns:
-                ts  = signals[sn]["timestamp_s"].values
+                ts = signals[sn]["timestamp_s"].values
                 val = signals[sn][col].values
                 if len(ts) == len(t_ref):
                     combined[col] = val
@@ -711,7 +711,7 @@ class LiveDataCollector:
         if "ACC" in signals:
             for ax in ["ACC_X_g", "ACC_Y_g", "ACC_Z_g"]:
                 if ax in signals["ACC"].columns:
-                    ts  = signals["ACC"]["timestamp_s"].values
+                    ts = signals["ACC"]["timestamp_s"].values
                     val = signals["ACC"][ax].values
                     if len(ts) > 1:
                         f = interp1d(ts, val, kind="linear",
@@ -737,9 +737,9 @@ class LiveDataCollector:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def collect_from_file(
-    csv_path:       str | Path,
-    user_id:        str   = "test_participant",
-    speed_factor:   float = 10.0,
+    csv_path: str | Path,
+    user_id: str = "test_participant",
+    speed_factor: float = 10.0,
     max_duration_s: float = None,
 ) -> PipelinePacket:
     """
@@ -749,16 +749,16 @@ def collect_from_file(
     """
     adapter = FileStreamAdapter(csv_path, speed_factor=speed_factor)
     return LiveDataCollector(
-        device_adapter  = adapter,
-        user_id         = user_id,
-        max_duration_s  = max_duration_s,
+        device_adapter=adapter,
+        user_id=user_id,
+        max_duration_s=max_duration_s,
     ).run()
 
 
 def collect_from_empatica_e4(
-    user_id: str  = "participant_001",
-    host:    str  = "127.0.0.1",
-    port:    int  = 28000,
+    user_id: str = "participant_001",
+    host: str = "127.0.0.1",
+    port: int = 28000,
     max_duration_s: float = None,
 ) -> PipelinePacket:
     """
@@ -768,7 +768,7 @@ def collect_from_empatica_e4(
     """
     adapter = EmpaticaE4Adapter(host=host, port=port)
     return LiveDataCollector(
-        device_adapter  = adapter,
-        user_id         = user_id,
-        max_duration_s  = max_duration_s,
+        device_adapter=adapter,
+        user_id=user_id,
+        max_duration_s=max_duration_s,
     ).run()

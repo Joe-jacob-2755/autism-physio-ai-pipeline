@@ -35,9 +35,9 @@ class NoiseInjector:
     def __init__(self, level: str = "medium", seed: Optional[int] = None):
         if level not in NOISE_PROFILES:
             raise ValueError(f"level must be one of {list(NOISE_PROFILES)}.")
-        self.level   = level
+        self.level = level
         self.profile = NOISE_PROFILES[level]
-        self.rng     = np.random.default_rng(seed)
+        self.rng = np.random.default_rng(seed)
 
     # ── Master entry point ──────────────────────────────────────────────────
 
@@ -91,9 +91,9 @@ class NoiseInjector:
     # ── EDA noise ────────────────────────────────────────────────────────────
 
     def _noise_eda(self, sig: np.ndarray) -> np.ndarray:
-        n      = len(sig)
-        fs     = SAMPLING_RATES["EDA"]
-        p      = self.profile["EDA"]
+        n = len(sig)
+        fs = SAMPLING_RATES["EDA"]
+        p = self.profile["EDA"]
         result = sig.copy().astype(float)
 
         # Gaussian sensor noise
@@ -122,9 +122,9 @@ class NoiseInjector:
     # ── BVP noise ────────────────────────────────────────────────────────────
 
     def _noise_bvp(self, sig: np.ndarray) -> np.ndarray:
-        n      = len(sig)
-        fs     = SAMPLING_RATES["BVP"]
-        p      = self.profile["BVP"]
+        n = len(sig)
+        fs = SAMPLING_RATES["BVP"]
+        p = self.profile["BVP"]
         result = sig.copy().astype(float)
 
         # Gaussian noise
@@ -140,12 +140,12 @@ class NoiseInjector:
 
         # Motion artifact: short burst of broadband noise
         if p.get("motion_amp", 0) > 0:
-            n_bursts   = max(1, int(n / (fs * 30)))   # ~1 burst per 30 s
+            n_bursts = max(1, int(n / (fs * 30)))   # ~1 burst per 30 s
             for _ in range(n_bursts):
                 burst_start = int(self.rng.integers(0, max(1, n - fs * 3)))
-                burst_len   = int(self.rng.uniform(0.5, 3.0) * fs)
-                burst_end   = min(burst_start + burst_len, n)
-                artifact    = p["motion_amp"] * self.rng.standard_normal(
+                burst_len = int(self.rng.uniform(0.5, 3.0) * fs)
+                burst_end = min(burst_start + burst_len, n)
+                artifact = p["motion_amp"] * self.rng.standard_normal(
                     burst_end - burst_start
                 )
                 # Taper edges
@@ -155,7 +155,7 @@ class NoiseInjector:
         # Baseline wander (very slow drift from electrode movement)
         wander_raw = np.cumsum(self.rng.normal(0, 0.3, n))
         wander_raw -= wander_raw.mean()
-        b, a   = sp_signal.butter(2, 0.5 / (fs / 2), btype="low")
+        b, a = sp_signal.butter(2, 0.5 / (fs / 2), btype="low")
         wander = sp_signal.filtfilt(b, a, wander_raw)
         wander *= (p["gaussian_std"] * 0.5) / (np.std(wander) + 1e-9)
         result += wander
@@ -180,9 +180,9 @@ class NoiseInjector:
         Add Gaussian noise with slight correlated component across axes
         (simulates common-mode vibration artefact).
         """
-        p   = self.profile["ACC"]
+        p = self.profile["ACC"]
         std = p["gaussian_std"]
-        n   = len(ax)
+        n = len(ax)
 
         # Shared vibration component (10 % weight)
         common = self.rng.normal(0, std * 0.10, n)

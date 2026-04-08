@@ -52,27 +52,27 @@ class PreprocessingExporter:
 
     def __init__(self, output_dir: str | Path):
         self.base = Path(output_dir)
-        self.raw_dir  = self.base / "features_raw"
+        self.raw_dir = self.base / "features_raw"
         self.norm_dir = self.base / "features_normalised"
-        self.raw_dir.mkdir(parents=True,  exist_ok=True)
+        self.raw_dir.mkdir(parents=True, exist_ok=True)
         self.norm_dir.mkdir(parents=True, exist_ok=True)
 
     # ── Master export ─────────────────────────────────────────────────────
 
     def export_all(
         self,
-        raw_features:     Dict[str, pd.DataFrame],
-        norm_features:    Dict[str, pd.DataFrame],
-        raw_combined:     pd.DataFrame,
-        norm_combined:    pd.DataFrame,
+        raw_features: Dict[str, pd.DataFrame],
+        norm_features: Dict[str, pd.DataFrame],
+        raw_combined: pd.DataFrame,
+        norm_combined: pd.DataFrame,
         cleaning_reports: list,
-        metadata:         dict,
+        metadata: dict,
     ) -> Dict[str, Path]:
         """Write all output files and return {label: path} dict."""
         saved = {}
 
         print("[Exporter M3] Writing non-normalised individual CSVs ...")
-        saved.update(self._write_individual(raw_features,  self.raw_dir,  suffix=""))
+        saved.update(self._write_individual(raw_features, self.raw_dir, suffix=""))
 
         print("[Exporter M3] Writing non-normalised combined CSV ...")
         saved["raw_combined"] = self._write_df(
@@ -101,13 +101,13 @@ class PreprocessingExporter:
     def _write_individual(
         self,
         feature_dfs: Dict[str, pd.DataFrame],
-        out_dir:     Path,
-        suffix:      str,
+        out_dir: Path,
+        suffix: str,
     ) -> Dict[str, Path]:
         saved = {}
         for sig_name, df in feature_dfs.items():
             fname = f"{sig_name}_features{suffix}.csv"
-            path  = self._write_df(df, out_dir / fname)
+            path = self._write_df(df, out_dir / fname)
             saved[f"{sig_name}{suffix}"] = path
         return saved
 
@@ -117,14 +117,14 @@ class PreprocessingExporter:
         if not reports:
             return None
         rows = [r.to_dict() if hasattr(r, "to_dict") else r for r in reports]
-        df   = pd.DataFrame(rows)
+        df = pd.DataFrame(rows)
         return self._write_df(df, self.base / "cleaning_report.csv")
 
     # ── Metadata JSON ─────────────────────────────────────────────────────
 
     def _write_metadata(self, metadata: dict) -> Path:
         meta = {
-            "module":          f"M3 v{MODULE_VERSION}",
+            "module": f"M3 v{MODULE_VERSION}",
             "preprocessed_at": datetime.now().isoformat(),
             **metadata,
         }
