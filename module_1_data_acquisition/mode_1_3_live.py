@@ -466,8 +466,8 @@ class SessionAnnotator:
         lines = ["  Annotated events:"]
         for ev in evs:
             dur = f"{ev.duration_s:.1f}s" if ev.duration_s else "open"
-            lines.append(f"    {ev.emotion:<12} t={ev.start_s:.1f}–"
-                         f"{ev.end_s:.1f if ev.end_s else '?':.1f}s  ({dur})")
+            end_str = f"{ev.end_s:.1f}" if ev.end_s is not None else "?"
+            lines.append(f"    {ev.emotion:<12} t={ev.start_s:.1f}–{end_str}s  ({dur})")
         return "\n".join(lines)
 
 

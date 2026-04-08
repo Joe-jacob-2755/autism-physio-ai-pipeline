@@ -26,7 +26,7 @@ from typing import Optional
 # ── Ensure module directory is on sys.path ────────────────────────────────────
 MODULE_DIR    = Path(__file__).resolve().parent
 REPO_ROOT     = MODULE_DIR.parent
-M1A_DIR       = REPO_ROOT / "module_1a_data_simulation"
+M1A_DIR       = REPO_ROOT / "module_2a_data_simulation"
 sys.path.insert(0, str(MODULE_DIR))
 sys.path.insert(0, str(M1A_DIR))
 

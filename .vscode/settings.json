@@ -7,6 +7,16 @@
   "python.terminal.activateEnvironment": true,
   "python.terminal.activateEnvInCurrentTerminal": true,
 
+  // ── Pylance / type checking ───────────────────────────────────────────────
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/module_1_data_acquisition",
+    "${workspaceFolder}/module_2a_data_simulation",
+    "${workspaceFolder}/module_3_preprocessing"
+  ],
+  "python.analysis.exclude": [
+    "${workspaceFolder}/.venv"
+  ],
+
   // ── Linting ───────────────────────────────────────────────────────────────
   "python.linting.enabled": true,
   "python.linting.pylintEnabled": false,
@@ -56,13 +66,13 @@
 
   // ── Terminal ──────────────────────────────────────────────────────────────
   "terminal.integrated.env.linux": {
-    "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation"
+    "PYTHONPATH": "${workspaceFolder}/module_1_data_acquisition:${workspaceFolder}/module_2a_data_simulation:${workspaceFolder}/module_3_preprocessing"
   },
   "terminal.integrated.env.osx": {
-    "PYTHONPATH": "${workspaceFolder}/module_1a_data_simulation"
+    "PYTHONPATH": "${workspaceFolder}/module_1_data_acquisition:${workspaceFolder}/module_2a_data_simulation:${workspaceFolder}/module_3_preprocessing"
   },
   "terminal.integrated.env.windows": {
-    "PYTHONPATH": "${workspaceFolder}\\module_1a_data_simulation"
+    "PYTHONPATH": "${workspaceFolder}\\module_1_data_acquisition;${workspaceFolder}\\module_2a_data_simulation;${workspaceFolder}\\module_3_preprocessing"
   },
 
   // ── Test discovery ────────────────────────────────────────────────────────

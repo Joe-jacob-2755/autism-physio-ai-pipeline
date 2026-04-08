@@ -30,12 +30,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Union, List
 
-from pipeline_packet import PipelinePacket
-
 # ── Module directory on path ──────────────────────────────────────────────────
 MODULE_DIR = Path(__file__).resolve().parent
 if str(MODULE_DIR) not in sys.path:
     sys.path.insert(0, str(MODULE_DIR))
+
+from pipeline_packet import PipelinePacket
 
 
 # ─────────────────────────────────────────────────────────────────────────────
