@@ -211,9 +211,13 @@ def simulate_one_user(
 def run_simulation(
     duration_s, n_events, event_duration_s, emotions,
     noise_level, seed, n_users=1, shared_events_flag=False,
-    out_name=None, generate_plots=True,
+    out_name=None, generate_plots=True, output_dir=None,
 ):
-    run_folder = next_run_folder(out_name)
+    if output_dir is not None:
+        run_folder = Path(output_dir)
+        run_folder.mkdir(parents=True, exist_ok=True)
+    else:
+        run_folder = next_run_folder(out_name)
     rel_path = run_folder.relative_to(MODULE_DIR)
 
     print("=" * 64)

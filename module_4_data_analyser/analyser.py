@@ -86,6 +86,7 @@ class DataAnalyser:
         source: Union[str, Path, dict],
         session_id: str = "unknown",
         user_id: str = "unknown",
+        output_dir: str = None,
     ) -> dict:
         """
         Run full analysis pipeline.
@@ -97,12 +98,23 @@ class DataAnalyser:
                    'features_raw' — {name: DataFrame} (M3 feature CSVs)
         """
         t0 = time.time()
-        run_folder = _next_run_folder(self.out_name)
+        if output_dir is not None:
+            run_folder = Path(output_dir)
+            run_folder.mkdir(parents=True, exist_ok=True)
+        else:
+            run_folder = _next_run_folder(self.out_name)
 
         self._log("=" * 64)
         self._log(f"  MODULE 4  —  Data Analyser  |  v{MODULE_VERSION}")
         self._log(f"  Session: {session_id}  |  User: {user_id}")
-        self._log(f"  Output:  {run_folder.relative_to(MODULE_DIR)}")
+        try:
+            _rel = run_folder.relative_to(MODULE_DIR)
+        except ValueError:
+            try:
+                _rel = run_folder.relative_to(MODULE_DIR.parent)
+            except ValueError:
+                _rel = run_folder
+        self._log(f"  Output:  {_rel}")
         self._log("=" * 64)
 
         # ── Load data ─────────────────────────────────────────────────────

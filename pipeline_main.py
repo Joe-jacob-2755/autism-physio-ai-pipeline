@@ -31,6 +31,10 @@ needing subprocesses or renaming any files.
 =============================================================================
 """
 from __future__ import annotations
+from output_manager import (
+    next_pipeline_run_folder, standalone_run_folder,
+    module_subdir, user_subdir, RunManifest, count_files,
+)
 import os
 import sys
 import re
@@ -50,6 +54,10 @@ M3_DIR = REPO_ROOT / "module_3_preprocessing"
 M4_DIR = REPO_ROOT / "module_4_data_analyser"
 
 PIPELINE_VERSION = "1.0.0"
+
+# Central output manager — all pipeline runs write here
+sys.path.insert(0, str(REPO_ROOT))
+CENTRAL_OUTPUTS = REPO_ROOT / "outputs"
 WIDTH = 66
 
 
@@ -645,43 +653,69 @@ def _collect_m4_params() -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def run_full_pipeline():
-    """Interactive full pipeline: Step 1 = M2, Step 2 = M3 per packet."""
-    _banner("Full Pipeline  —  M2 → M3")
+    """
+    Interactive full pipeline with CENTRAL output directory.
+
+    All module outputs go to:  outputs/run_NNN/
+        module_1_acquisition/user_NNN/   <- M1 signal CSVs + metadata
+        module_2a_simulation/user_NNN/   <- M2A CSVs + plots (if simulated)
+        module_3_preprocessing/user_NNN/ <- feature CSVs + plots
+        module_4_analysis/user_NNN/      <- analysis report + tables + plots
+    """
+    _banner("Full Pipeline  —  M1 → M2A → M3 → M4")
     print("""
-  Runs the complete data ingestion and preprocessing pipeline.
+  Runs the complete pipeline. All outputs go to a single numbered
+  folder under  outputs/run_NNN/  at the repo root.
 
   Flow:
-    ① Data Acquisition  (Module 2)
-         Import / Simulate / Live / Deployment
-    ② Preprocessing     (Module 3)
-         Clean → Filter → Extract → Normalise → Export
+    ① Data Acquisition   (Module 1)
+    ② Preprocessing      (Module 3)
+    ③ Analysis           (Module 4, optional)
 """)
     if not _ask_yn("Continue?", True):
         return
 
     t_start = time.time()
 
-    # ── Step 1: Module 2 ──────────────────────────────────────────────
-    _step_header(1, 2, "Data Acquisition  (Module 2)")
-    m2_params = _collect_m2_params()
+    # ── Create central run folder ─────────────────────────────────────────
+    run_folder = next_pipeline_run_folder()
+    manifest = RunManifest(run_folder)
+    rel_run = run_folder.relative_to(REPO_ROOT)
 
-    print("\n  Starting Module 2 ...")
-    packets = run_module_2(m2_params)
-    _ok(f"Module 2 complete — {len(packets)} packet(s) acquired")
+    print(f"\n  📁  Central output folder: {rel_run}\n")
+
+    # ── Step 1: Module 1 — Data Acquisition ──────────────────────────────
+    _step_header(1, 3, "Data Acquisition  (Module 1)")
+    m1_params = _collect_m2_params()
+
+    # Route M1 outputs to central folder
+    m1_out = module_subdir(run_folder, "module_1_acquisition")
+    m1_params["_output_dir"] = str(m1_out)
+
+    print("\n  Starting Module 1 ...")
+    packets = run_module_2(m1_params)
+    _ok(f"Module 1 complete — {len(packets)} packet(s) acquired")
+
+    manifest.record_module("M1", m1_out, {"mode": m1_params.get("mode"), "n_packets": len(packets)})
+    manifest.save()
 
     if not packets:
         print("\n  ✗  No data packets returned. Aborting.")
         return
 
-    # ── Step 2: Module 3 — one run per packet ─────────────────────────
-    _step_header(2, 2, "Data Preprocessing  (Module 3)")
+    # ── Step 2: Module 3 — Preprocessing ─────────────────────────────────
+    _step_header(2, 3, "Data Preprocessing  (Module 3)")
     m3_params = _collect_m3_params(skip_source=True)
+    m3_out = module_subdir(run_folder, "module_3_preprocessing")
 
-    all_results = []
+    all_m3_results = []
     for i, packet in enumerate(packets, 1):
         uid = getattr(packet, "user_id", f"user_{i:03d}")
         sid = getattr(packet, "session_id", f"session_{i:03d}")
-        print(f"\n  Processing packet {i}/{len(packets)}  [{uid}]")
+        print(f"\n  Preprocessing packet {i}/{len(packets)}  [{uid}]")
+
+        # Per-user subdirectory inside module_3_preprocessing/
+        user_m3_dir = user_subdir(m3_out, uid)
 
         # Auto-extract demographics from packet metadata
         dem = m3_params.get("demographics")
@@ -689,21 +723,27 @@ def run_full_pipeline():
             meta_user = packet.metadata.get("user", {})
             if meta_user:
                 dem = {k: meta_user[k]
-                       for k in ("age", "gender", "ethnicity", "autism_severity",
-                                 "verbal_status", "comorbidity")
+                       for k in ("age", "gender", "ethnicity",
+                                 "autism_severity", "verbal_status", "comorbidity")
                        if k in meta_user and meta_user[k] is not None}
 
         result = run_module_3(
             source=packet, params=m3_params,
-            session_id=sid, user_id=uid, demographics=dem,
+            session_id=sid, user_id=uid,
+            demographics=dem,
+            output_dir=str(user_m3_dir),
         )
-        all_results.append(result)
+        all_m3_results.append(result)
+        manifest.record_user(uid, dem)
 
-    # ── Optional Step 3: Module 4 Analysis ───────────────────────────────
-    if all_results:
+    manifest.record_module("M3", m3_out, {"n_users": len(all_m3_results)})
+    manifest.save()
+
+    # ── Step 3: Module 4 — Analysis (optional) ────────────────────────────
+    if all_m3_results:
         _section("📊  Optional — Data Analysis  (Module 4)")
         print("""
-  Module 4 analyses the preprocessed signals and extracted features:
+  Module 4 analyses preprocessed signals and extracted features:
     • Descriptive, statistical and correlation analysis
     • Temporal dynamics (time to peak, subside, return to median)
     • Adaptive threshold detection
@@ -713,9 +753,13 @@ def run_full_pipeline():
         run_m4 = _ask_yn("Run data analysis (Module 4)?", True)
         if run_m4:
             m4_params = _collect_m4_params()
-            for result in all_results:
+            m4_out = module_subdir(run_folder, "module_4_analysis")
+
+            for result in all_m3_results:
                 m4_uid = result["metadata"].get("user_id", "user_001")
                 m4_sid = result["metadata"].get("session_id", "session_001")
+                user_m4_dir = user_subdir(m4_out, m4_uid)
+
                 print(f"\n  Analysing [{m4_uid}] ...")
                 run_module_4(
                     source=result["run_folder"],
@@ -724,19 +768,29 @@ def run_full_pipeline():
                     threshold_sustain_s=m4_params["sustain_s"],
                     session_id=m4_sid,
                     user_id=m4_uid,
+                    output_dir=str(user_m4_dir),
                 )
 
+            manifest.record_module("M4", m4_out)
+
+    # ── Finalise ──────────────────────────────────────────────────────────
+    manifest_path = manifest.complete()
     elapsed = time.time() - t_start
-    _section(f"✅  Full Pipeline Complete  ({elapsed:.1f}s)")
-    print(f"\n  Packets processed : {len(packets)}")
-    print("  M3 output folders :")
-    for r in all_results:
-        try:
-            rel = r["run_folder"].relative_to(REPO_ROOT)
-        except Exception:
-            rel = r["run_folder"]
-        print(f"    {rel}")
-    print()
+
+    _section(f"✅  Pipeline Complete  ({elapsed:.1f}s)")
+    total = count_files(run_folder)
+    print(f"""
+  📁  {rel_run}
+      {total['csv']} CSV files  |  {total['png']} PNG plots  |  {total['html']} HTML reports
+      {total['json']} JSON metadata files  |  {total['total']} total files
+
+  Folder structure:
+    {rel_run}/
+      module_1_acquisition/  ← signal CSVs from acquisition
+      module_3_preprocessing/ ← feature CSVs + signal plots
+      module_4_analysis/      ← analysis report + tables + 3D plot
+      run_manifest.json       ← full run index
+""")
     _pause()
 
 
@@ -806,21 +860,23 @@ def run_preprocessing_standalone():
         uid = target.name if target != source else "user_001"
         print(f"\n  [{i}/{len(targets)}]  Preprocessing: {uid}")
 
+        user_out = run_folder / uid
         result = run_module_3(
             source=target, params=m3_params,
-            session_id=source.name, user_id=uid, demographics=dem,
+            session_id=source.name, user_id=uid,
+            demographics=dem,
+            output_dir=str(user_out),
         )
         all_results.append(result)
 
     elapsed = time.time() - t_start
+    total = count_files(run_folder)
     _section(f"✅  Preprocessing Complete  ({elapsed:.1f}s)")
-    for r in all_results:
-        try:
-            rel = r["run_folder"].relative_to(REPO_ROOT)
-        except Exception:
-            rel = r["run_folder"]
-        print(f"    {rel}")
-    print()
+    print(f"""
+  📁  {rel_run}
+      {total['csv']} CSV files  |  {total['png']} PNG plots
+      {total['total']} total files
+""")
     _pause()
 
 

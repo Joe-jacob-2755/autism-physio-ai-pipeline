@@ -295,7 +295,11 @@ class DataAcquisitionModule:
         if not self.save_packets:
             return packets
 
-        run_folder = next_run_folder(mode, self.out_name)
+        if self.output_dir is not None:
+            run_folder = Path(self.output_dir)
+            run_folder.mkdir(parents=True, exist_ok=True)
+        else:
+            run_folder = next_run_folder(mode, self.out_name)
 
         for packet in packets:
             uid = packet.user_id

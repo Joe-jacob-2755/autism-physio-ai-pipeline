@@ -39,3 +39,5 @@ dataset/
 .DS_Store
 Thumbs.db
 module_4_data_analyser/outputs/
+outputs/
+*/outputs/

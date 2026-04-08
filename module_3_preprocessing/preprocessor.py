@@ -160,6 +160,7 @@ class DataPreprocessor:
         demographics: dict = None,  # participant demographics (from UserProfile)
         session_id: str = "unknown",
         user_id: str = "unknown",
+        output_dir: str = None,
     ) -> dict:
         """
         Run the full preprocessing pipeline.
@@ -182,8 +183,15 @@ class DataPreprocessor:
           run_folder, cleaning_reports
         """
         t0 = time.time()
-        run_folder = next_run_folder(self.out_name)
-        rel = run_folder.relative_to(MODULE_DIR)
+        if output_dir is not None:
+            run_folder = Path(output_dir)
+            run_folder.mkdir(parents=True, exist_ok=True)
+        else:
+            run_folder = next_run_folder(self.out_name)
+        try:
+            rel = run_folder.relative_to(MODULE_DIR)
+        except ValueError:
+            rel = run_folder.relative_to(MODULE_DIR.parent) if MODULE_DIR.parent in run_folder.parents else run_folder
 
         self._log("=" * 64)
         self._log(f"  MODULE 3  —  Data Preprocessing  |  v{MODULE_VERSION}")
