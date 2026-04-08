@@ -74,6 +74,6 @@
   "markdown.preview.breaks": true,
 
   // ── Workspace ─────────────────────────────────────────────────────────────
-  "workbench.colorTheme": "Default Dark Modern",
+  "workbench.colorTheme": "Dark Modern",
   "workbench.startupEditor": "readme"
 }
