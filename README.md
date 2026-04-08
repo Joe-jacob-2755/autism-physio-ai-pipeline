@@ -1,4 +1,4 @@
-# 🧠 Autism Physio-AI Pipeline
+# Autism Physio-AI Pipeline
 
 <p align="center">
   <img src="module_2a_data_simulation/assets/combined_signals_preview.png" alt="Physiological Signal Preview" width="860"/>
@@ -16,41 +16,64 @@
 
 ## Overview
 
-An end-to-end AI pipeline for **predicting emotions and behaviours in autistic children** using physiological signals acquired from wearable devices. The pipeline covers the full lifecycle from synthetic data generation through to live inference and deployment.
+An end-to-end AI pipeline for **predicting emotions and behaviours in autistic children** using physiological signals from wrist-worn wearable devices (Empatica E4 and equivalents).
 
-Autistic children — particularly those who are non-verbal or minimally verbal — often cannot communicate internal states such as fear, pain, hunger, or distress. This pipeline aims to provide caregivers and clinicians with an objective, continuous, non-invasive window into those states using wrist-worn physiological sensors.
+Autistic children — particularly those who are non-verbal or minimally verbal — often cannot communicate internal states such as fear, pain, hunger, or distress. This pipeline provides caregivers and clinicians with an objective, continuous, non-invasive window into those states.
 
 ---
 
 ## Pipeline Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        AUTISM PHYSIO-AI PIPELINE                            │
-├──────────┬──────────┬──────────┬──────────┬──────────┬───────────────────  │
-│ Module   │ Module   │ Module   │ Module   │ Module   │ Modules             │
-│   1A     │   1B     │   2      │   3      │   4      │  5 – 9              │
-│ Data     │ Live     │ Pre-     │ Feature  │ Model    │ Inference / App /   │
-│ Simu-    │ Data     │ process- │ Extract- │ Training │ Validation /        │
-│ lation   │ Ingest.  │ ing      │ ion      │          │ Deployment          │
-│ ✅ v1.0  │ Planned  │ Planned  │ Planned  │ Planned  │ Planned             │
-└──────────┴──────────┴──────────┴──────────┴──────────┴─────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      AUTISM PHYSIO-AI PIPELINE                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
+  │ Module   │    │ Module   │    │ Module   │    │ Module   │
+  │   2A     │──▶│   1      │──▶│   3      │──▶│   4      │
+  │ Simulate │    │ Acquire  │    │ Preproc. │    │ Feature  │
+  │ ✅v1.1.0 │    │ ✅v1.0.0 │    │ ✅v1.0.0 │    │ Engineer.│
+  └──────────┘    └──────────┘    └──────────┘    └──────────┘
+                       │ is_annotated=False               │
+                       │ → skip to M9                     ▼
+                       │                          ┌──────────┐
+                       │                          │ Module   │
+                       │                          │   5      │
+                       │                          │ Training │
+                       │                          └──────────┘
+                       │                               │
+                       │                    ┌──────────┼──────────┐
+                       │                    ▼          ▼          ▼
+                       │             unimodal    multimodal   Module 6
+                       │              models      model      Evaluate
+                       │                    └──────────┼──────────┘
+                       │                               ▼
+                       │                          Module 7
+                       │                          Decision
+                       │                          Fusion
+                       │                               │
+                       │                          Module 8
+                       │                          Model Mgmt
+                       │                               │
+                       └──────────────────────▶  Module 9
+                        is_annotated=False        Deployment
+                                                  + Inference
 ```
 
-### Module Descriptions
+### Module Status
 
 | Module | Name | Status | Description |
 |--------|------|--------|-------------|
-| **1A** | Data Simulation | ✅ v1.0.0 | Synthetic physiological signal generation for pipeline development and model validation |
-| **1B** | Live Data Ingestion | 🔜 Planned | Real-time data acquisition from wearable devices |
-| **2** | Preprocessing | 🔜 Planned | Filtering, artefact removal, segmentation, normalisation |
-| **3** | Feature Extraction | 🔜 Planned | Time-domain, frequency-domain, and non-linear features per window |
-| **4** | Model Training | 🔜 Planned | Multi-class classifier training, validation, and cross-validation |
-| **5** | Inference Engine | 🔜 Planned | Real-time prediction from live signals |
-| **6** | Alert & Output | 🔜 Planned | Caregiver notifications, logging, and dashboard |
-| **7** | Validation | 🔜 Planned | Clinical validation framework and metrics |
-| **8** | Model Management | 🔜 Planned | Versioning, retraining, and model registry |
-| **9** | Deployment | 🔜 Planned | Edge deployment and device integration |
+| **2A** | Data Simulation | ✅ v1.1.0 | Synthetic physiological signal generation with participant demographics |
+| **1** | Data Acquisition | ✅ v1.0.0 | Gateway routing all data sources into a standardised `PipelinePacket` |
+| **3** | Preprocessing | ✅ v1.0.0 | Signal cleaning, filtering, 80-feature extraction, and RobustScaler normalisation |
+| **4** | Feature Engineering | 🔜 Planned | Cross-signal features, temporal dynamics, dimensionality reduction |
+| **5** | Model Training | 🔜 Planned | Unimodal and multimodal classifier training with stratified cross-validation |
+| **6** | Model Evaluation | 🔜 Planned | Clinical metrics, per-demographic analysis, calibration |
+| **7** | Decision Fusion | 🔜 Planned | Combine unimodal model predictions via weighted/stacked fusion |
+| **8** | Model Management | 🔜 Planned | Versioned model registry, retraining triggers, ONNX export |
+| **9** | Deployment | 🔜 Planned | Real-time inference, caregiver alerts, edge deployment |
 
 ---
 
@@ -66,29 +89,74 @@ The pipeline targets **10 emotion and behaviour states** relevant to autistic ch
 
 ## Physiological Signals
 
-All modules operate on five wearable sensor modalities:
+All modules operate on five wearable sensor modalities from the Empatica E4:
 
-| Signal | Description | Sample Rate |
-|--------|-------------|------------|
-| EDA | Electrodermal Activity (Skin Conductance) | 4 Hz |
-| BVP | Blood Volume Pulse (PPG) | 64 Hz |
-| IBI | Inter-Beat Interval | Event-based |
-| ST | Skin Temperature | 4 Hz |
-| ACC | 3-Axis Accelerometer | 32 Hz |
+| Signal | Description | Sample Rate | Unit |
+|--------|-------------|-------------|------|
+| EDA | Electrodermal Activity (Skin Conductance) | 4 Hz | µS |
+| BVP | Blood Volume Pulse (PPG) | 64 Hz | nT |
+| IBI | Inter-Beat Interval | Event-based | ms |
+| ST | Skin Temperature | 4 Hz | °C |
+| ACC | 3-Axis Accelerometer | 32 Hz | g |
+
+---
+
+## PipelinePacket — Inter-Module Data Contract
+
+All modules exchange data through a single standardised `PipelinePacket`:
+
+```python
+PipelinePacket:
+  signals:       Dict[str, pd.DataFrame]   # {signal_name: DataFrame at native rate}
+  combined:      pd.DataFrame              # all channels resampled to 64 Hz
+  metadata:      dict                      # session info, demographics, SQI
+  source_type:   'imported' | 'simulated' | 'live' | 'deployment'
+  is_annotated:  bool                      # False → deployment inference path
+  session_id:    str
+  user_id:       str
+```
+
+- `is_annotated = True` → training/evaluation path (Modules 3–8)
+- `is_annotated = False` → live deployment path (Module 9 only)
 
 ---
 
 ## Getting Started
 
-Start with **Module 2A** to generate synthetic training data:
+### Prerequisites
 
 ```bash
-cd module_2a_data_simulation
-pip install -r requirements.txt
-python main.py
+# Windows
+scripts\setup.bat
+
+# Mac / Linux
+bash scripts/setup.sh
+
+# Activate virtual environment (Windows)
+.venv\Scripts\activate
 ```
 
-See the [Module 2A README](module_2a_data_simulation/README.md) for full documentation.
+### Run the full pipeline (simulation → preprocessing)
+
+```bash
+python pipeline_main.py
+```
+
+### Run individual modules
+
+```bash
+# Module 2A — generate synthetic data
+cd module_2a_data_simulation
+python main.py
+
+# Module 1 — acquire / route data
+.\run_data_acquisition_module.bat     # Windows
+./run_data_acquisition_module.sh      # Mac/Linux
+
+# Module 3 — preprocess signals
+.\run_data_preprocessing.bat          # Windows
+./run_data_preprocessing.sh           # Mac/Linux
+```
 
 ---
 
@@ -96,36 +164,129 @@ See the [Module 2A README](module_2a_data_simulation/README.md) for full documen
 
 ```
 autism-physio-ai-pipeline/
-├── module_2a_data_simulation/   ← Synthetic data generation (v1.0.0)
-│   ├── README.md
-│   ├── main.py
-│   ├── config.py
-│   ├── simulator.py
-│   ├── signal_models.py
-│   ├── event_scheduler.py
-│   ├── noise_injector.py
-│   ├── annotator.py
-│   ├── visualizer.py
-│   ├── exporter.py
-│   ├── requirements.txt
-│   ├── docs/
-│   │   ├── QUICKSTART.md
-│   │   ├── ARCHITECTURE.md
-│   │   ├── API_REFERENCE.md
-│   │   ├── SIGNAL_SPECIFICATIONS.md
-│   │   └── EMOTION_PROFILES.md
-│   └── assets/
-└── (further modules to follow)
+├── CLAUDE.md                          ← Full AI-assistant context
+├── README.md                          ← This file
+├── pipeline_main.py                   ← Master orchestrator (M2A → M1 → M3)
+│
+├── run_full_pipeline.bat / .sh        ← Full pipeline launcher
+├── run_data_acquisition_module.bat/.sh← Module 1 standalone
+├── run_data_preprocessing.bat / .sh   ← Module 3 standalone
+│
+├── scripts/
+│   ├── setup.bat                      ← Windows environment setup
+│   └── setup.sh                       ← Mac/Linux environment setup
+│
+├── tests/
+│   └── test_module_1a.py              ← Module 2A test suite (35 tests)
+│
+├── module_2a_data_simulation/         ← ✅ Built v1.1.0
+│   ├── config.py                      ← Sampling rates, signal ranges, emotion profiles
+│   ├── signal_models.py               ← Waveform generators (SCR, PPG, AR-HRV, thermal, ACC)
+│   ├── event_scheduler.py             ← Non-overlapping emotion event placement
+│   ├── simulator.py                   ← 6-step simulation pipeline
+│   ├── noise_injector.py              ← Low / medium / high noise tiers
+│   ├── annotator.py                   ← Event labels, SQI, sample-level labels
+│   ├── visualizer.py                  ← Signal plots with event timeline bar
+│   ├── exporter.py                    ← Per-signal CSVs, combined CSV, metadata JSON
+│   ├── user_profiles.py               ← Participant demographics + physiology
+│   └── main.py                        ← CLI + interactive menu
+│
+├── module_1_data_acquisition/         ← ✅ Built v1.0.0
+│   ├── pipeline_packet.py             ← PipelinePacket dataclass (inter-module contract)
+│   ├── mode_1_1_import.py             ← Load existing CSV folders
+│   ├── mode_1_2_simulate.py           ← Call Module 2A in-process
+│   ├── mode_1_3_live.py               ← Live BLE streaming + real-time annotation
+│   ├── mode_1_4_deployment.py         ← Strip labels → deployment path
+│   ├── acquisition_module.py          ← Orchestrator
+│   └── main.py                        ← Interactive menu CLI
+│
+├── module_3_preprocessing/            ← ✅ Built v1.0.0
+│   ├── config.py                      ← Filter defaults, cleaning thresholds, scaler rationale
+│   ├── signal_cleaner.py              ← Missing data, out-of-range, flatline detection
+│   ├── signal_filters.py              ← Butterworth, Hampel, Kalman (RTS smoother)
+│   ├── feature_extractor.py           ← 80 features across EDA/BVP/IBI/ST/ACC
+│   ├── normaliser.py                  ← RobustScaler + demographic encoding + feature fusion
+│   ├── visualiser.py                  ← Processed signal plots, raw-vs-processed comparison
+│   ├── exporter.py                    ← 4 CSV sets (raw/normalised × per-signal/combined)
+│   └── preprocessor.py                ← 6-step master orchestrator
+│
+├── module_4_feature_engineering/      ← 🔜 Planned
+├── module_5_model_training/           ← 🔜 Planned
+├── module_6_model_evaluation/         ← 🔜 Planned
+├── module_7_decision_fusion/          ← 🔜 Planned
+├── module_8_model_management/         ← 🔜 Planned
+└── module_9_deployment/               ← 🔜 Planned
 ```
+
+---
+
+## Module 2A — Simulation Output
+
+Each simulation run produces:
+
+```
+module_2a_data_simulation/outputs/M2A_v1.1.0_run_NNN/
+  EDA.csv, BVP.csv, IBI.csv, ST.csv, ACC.csv   ← native sampling rate
+  combined_signals.csv                           ← all channels at 64 Hz
+  signal_EDA.png ... combined_signals.png        ← with event timeline bar
+  annotations_events.csv
+  annotations_signal_quality.csv
+  annotations_sample_labels.csv
+  metadata.json
+```
+
+Participant demographics (age, gender, autism severity, verbal status, comorbidity) are generated per user and propagated through all downstream modules.
+
+## Module 3 — Preprocessing Output
+
+Each run produces:
+
+```
+module_3_preprocessing/outputs/M3_v1.0.0_run_NNN/
+  features_raw/
+    EDA_features.csv, BVP_features.csv, IBI_features.csv
+    ST_features.csv, ACC_features.csv
+    combined_features.csv                         ← 80 features fused
+  features_normalised/
+    EDA_features_norm.csv ... combined_features_norm.csv
+  processed_EDA.png ... comparison_all_signals.png
+  cleaning_report.csv
+  preprocessing_metadata.json
+```
+
+The 80 features span time-domain, frequency-domain, and non-linear measures across all five signals, with demographic encodings appended to every row.
+
+---
+
+## Key Dependencies
+
+```
+numpy>=1.24.0        scipy>=1.10.0       pandas>=2.0.0
+matplotlib>=3.7.0    seaborn>=0.12.0     scikit-learn>=1.3.0
+antropy>=0.1.9       pykalman>=0.9.7     pytest>=7.4.0
+```
+
+---
+
+## Testing
+
+```bash
+python -m pytest tests/ -v --tb=short
+```
+
+35 tests currently cover Module 2A signal generation, event scheduling, noise injection, annotation, and export.
 
 ---
 
 ## References
 
-1. Kreibig, S. D. (2010). Autonomic nervous system activity in emotion: A review. *Biological Psychology, 84*(3), 394–421.
-2. Stephens, C. L., et al. (2022). Electrodermal activity in individuals with autism spectrum disorder. *Autism Research.*
-3. Kushki, A., et al. (2013). Investigating autonomic nervous system response to anxiety in ASD. *PLOS ONE, 8*(4).
+1. Kreibig, S. D. (2010). Autonomic nervous system activity in emotion. *Biological Psychology, 84*(3), 394–421.
+2. Stephens, C. L., et al. (2022). Electrodermal activity in individuals with ASD. *Autism Research.*
+3. Kushki, A., et al. (2013). Investigating ANS response to anxiety in ASD. *PLOS ONE, 8*(4).
 4. Task Force of the European Society of Cardiology. (1996). Heart rate variability standards. *Circulation, 93*(5).
+5. Boucsein, W. (2012). *Electrodermal Activity* (2nd ed.). Springer.
+6. Schoen, S. A., et al. (2008). Sensory over-responsivity and autonomic arousal in ASD. *Journal of Autism and Developmental Disorders.*
+7. Loomes, R., et al. (2017). What is the male-to-female ratio in ASD? *Journal of Child Psychology and Psychiatry, 58*(4).
 
 ---
 
