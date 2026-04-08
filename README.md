@@ -1,16 +1,12 @@
 # Autism Physio-AI Pipeline
 
-<p align="center">
-  <img src="module_2a_data_simulation/assets/combined_signals_preview.png" alt="Physiological Signal Preview" width="860"/>
-</p>
+![Physiological Signal Preview](module_2a_data_simulation/assets/combined_signals_preview.png)
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python" />
-  <img src="https://img.shields.io/badge/Status-Active-brightgreen" />
-  <img src="https://img.shields.io/badge/Domain-Autism%20%7C%20Affective%20Computing-purple" />
-  <img src="https://img.shields.io/badge/Signals-EDA%20%7C%20BVP%20%7C%20IBI%20%7C%20ST%20%7C%20ACC-teal" />
-  <img src="https://img.shields.io/badge/License-MIT-lightgrey" />
-</p>
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)
+![Status](https://img.shields.io/badge/Status-Active-brightgreen)
+![Domain](https://img.shields.io/badge/Domain-Autism%20%7C%20Affective%20Computing-purple)
+![Signals](https://img.shields.io/badge/Signals-EDA%20%7C%20BVP%20%7C%20IBI%20%7C%20ST%20%7C%20ACC-teal)
+![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
 ---
 
@@ -237,6 +233,8 @@ module_2a_data_simulation/outputs/M2A_v1.1.0_run_NNN/
 
 Participant demographics (age, gender, autism severity, verbal status, comorbidity) are generated per user and propagated through all downstream modules.
 
+---
+
 ## Module 3 — Preprocessing Output
 
 Each run produces:
@@ -261,9 +259,15 @@ The 80 features span time-domain, frequency-domain, and non-linear measures acro
 ## Key Dependencies
 
 ```
-numpy>=1.24.0        scipy>=1.10.0       pandas>=2.0.0
-matplotlib>=3.7.0    seaborn>=0.12.0     scikit-learn>=1.3.0
-antropy>=0.1.9       pykalman>=0.9.7     pytest>=7.4.0
+numpy>=1.24.0
+scipy>=1.10.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+scikit-learn>=1.3.0
+antropy>=0.1.9
+pykalman>=0.9.7
+pytest>=7.4.0
 ```
 
 ---
