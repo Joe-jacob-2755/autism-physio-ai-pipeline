@@ -109,25 +109,32 @@ def _sample_entropy(sig: np.ndarray, m: int = 2, r: float = None) -> float:
         except Exception:
             pass
 
-    # Fallback: simplified SampEn
-    n   = len(sig)
+    # Fallback: simplified SampEn with NumPy vectorisation.
+    # Subsample to ≤300 points (standard practice — SampEn is reliable at
+    # this length and avoids O(n²) cost on high-rate signals like ACC).
+    MAX_N = 300
+    if len(sig) > MAX_N:
+        step = len(sig) // MAX_N
+        sig  = sig[::step][:MAX_N]
+
+    n = len(sig)
     if n < 10:
         return np.nan
     r_val = r if r is not None else 0.2 * float(np.std(sig))
     if r_val == 0:
         return np.nan
 
-    def _count_matches(sig, m, r_val):
+    def _count_matches_vec(sig: np.ndarray, m: int, r_val: float) -> int:
+        """Vectorised template matching — O(n²) but in NumPy, not Python."""
+        templates = np.lib.stride_tricks.sliding_window_view(sig, m)  # (n-m+1, m)
         count = 0
-        for i in range(n - m):
-            template = sig[i: i + m]
-            for j in range(i + 1, n - m):
-                if np.max(np.abs(sig[j: j + m] - template)) < r_val:
-                    count += 1
+        for i in range(len(templates) - 1):
+            diffs = np.max(np.abs(templates[i + 1:] - templates[i]), axis=1)
+            count += int(np.sum(diffs < r_val))
         return count
 
-    A = _count_matches(sig, m + 1, r_val)
-    B = _count_matches(sig, m, r_val)
+    A = _count_matches_vec(sig, m + 1, r_val)
+    B = _count_matches_vec(sig, m, r_val)
     if B == 0:
         return np.nan
     return float(-np.log((A + 1e-12) / (B + 1e-12)))

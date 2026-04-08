@@ -9,15 +9,15 @@ standardised PipelinePacket(s) ready for Module 3 (Preprocessing).
 
 Acquisition modes
 -----------------
-  2.1  Import       — load existing CSV/folder data
-  2.2  Simulate     — generate new data via Module 1A
-  2.3  Live         — stream from a wearable device with annotation
-  2.4  Deployment   — ingest non-annotated data for inference
+ 2.1  Import       — load existing CSV/folder data
+ 2.2  Simulate     — generate new data via Module 1A
+ 2.3  Live         — stream from a wearable device with annotation
+ 2.4  Deployment   — ingest non-annotated data for inference
 
 Pipeline handoff
 ----------------
-  PipelinePacket.is_annotated = True  → training/testing path (Modules 3–8)
-  PipelinePacket.is_annotated = False → deployment inference path (Module 9)
+ PipelinePacket.is_annotated = True  → training/testing path (Modules 3–8)
+ PipelinePacket.is_annotated = False → deployment inference path (Module 9)
 
 =============================================================================
 """
