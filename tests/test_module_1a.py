@@ -69,7 +69,8 @@ def anger_result() -> SimulationResult:
 class TestConfig:
 
     def test_all_emotions_present(self):
-        assert len(EMOTIONS_ALL) == 10
+        # 10 original states + 3 behavioural targets added in Module 4 (SIB, ATO, GAB)
+        assert len(EMOTIONS_ALL) == 13
 
     def test_affective_emotions(self):
         expected = {"Happy", "Anger", "Fear", "Disgust", "Sad", "Surprise"}
