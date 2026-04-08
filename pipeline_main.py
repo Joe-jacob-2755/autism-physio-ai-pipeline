@@ -47,6 +47,7 @@ REPO_ROOT = Path(__file__).resolve().parent
 M2A_DIR = REPO_ROOT / "module_2a_data_simulation"
 M1_DIR  = REPO_ROOT / "module_1_data_acquisition"
 M3_DIR  = REPO_ROOT / "module_3_preprocessing"
+M4_DIR = REPO_ROOT / "module_4_data_analyser"
 
 PIPELINE_VERSION = "1.0.0"
 WIDTH = 66
@@ -61,6 +62,7 @@ _CONFLICTING_MODULES = {
     "config", "signal_filters", "signal_cleaner",
     "annotator", "exporter", "visualiser", "visualizer",
     "simulator", "main",
+    "analyser", "reporter", "signal_analyser", "statistical_analyser",
 }
 
 @contextmanager
@@ -588,6 +590,41 @@ def run_module_3(
         )
 
 
+
+def run_module_4(
+    source,
+    threshold_window_s:   float = 300.0,
+    threshold_mad_factor: float = 3.0,
+    threshold_sustain_s:  float = 30.0,
+    session_id:           str   = "pipeline_session",
+    user_id:              str   = "unknown",
+) -> dict:
+    """Execute Module 4 data analysis with isolated sys.path."""
+    with _isolated_import(M4_DIR):
+        from analyser import DataAnalyser
+        da = DataAnalyser(
+            threshold_window_s   = threshold_window_s,
+            threshold_mad_factor = threshold_mad_factor,
+            threshold_sustain_s  = threshold_sustain_s,
+            verbose              = True,
+        )
+        return da.run(source=source, session_id=session_id, user_id=user_id)
+
+
+
+def _collect_m4_params() -> dict:
+    """Collect Module 4 threshold parameters."""
+    _section("⚙️  Module 4 — Threshold settings")
+    print("""
+  Adaptive threshold flags sustained signal deviations from running median.
+  Recommended: window=300s (5 min), N=3×MAD, sustain=30s.
+""")
+    win_s   = _ask_float("Threshold window (seconds)", 300.0, 30.0)
+    mad_n   = _ask_float("Deviation multiplier (N × MAD)", 3.0, 1.0)
+    sustain = _ask_float("Minimum sustained duration (seconds)", 30.0, 1.0)
+    return {"window_s": win_s, "mad_factor": mad_n, "sustain_s": sustain}
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # FULL PIPELINE  (M2 → M3)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -646,6 +683,33 @@ def run_full_pipeline():
             session_id=sid, user_id=uid, demographics=dem,
         )
         all_results.append(result)
+
+    # ── Optional Step 3: Module 4 Analysis ───────────────────────────────
+    if all_results:
+        _section("📊  Optional — Data Analysis  (Module 4)")
+        print("""
+  Module 4 analyses the preprocessed signals and extracted features:
+    • Descriptive, statistical and correlation analysis
+    • Temporal dynamics (time to peak, subside, return to median)
+    • Adaptive threshold detection
+    • 3D time-synchronised signal projection
+    • Comprehensive HTML report + CSV tables
+""")
+        run_m4 = _ask_yn("Run data analysis (Module 4)?", True)
+        if run_m4:
+            m4_params = _collect_m4_params()
+            for result in all_results:
+                m4_uid = result["metadata"].get("user_id", "user_001")
+                m4_sid = result["metadata"].get("session_id", "session_001")
+                print(f"\n  Analysing [{m4_uid}] ...")
+                run_module_4(
+                    source               = result["run_folder"],
+                    threshold_window_s   = m4_params["window_s"],
+                    threshold_mad_factor = m4_params["mad_factor"],
+                    threshold_sustain_s  = m4_params["sustain_s"],
+                    session_id           = m4_sid,
+                    user_id              = m4_uid,
+                )
 
     elapsed = time.time() - t_start
     _section(f"✅  Full Pipeline Complete  ({elapsed:.1f}s)")
@@ -745,6 +809,43 @@ def run_preprocessing_standalone():
     _pause()
 
 
+
+def run_analysis_standalone():
+    """Run Module 4 independently on any existing Module 3 output."""
+    _banner("Data Analysis  —  Module 4")
+    print("""
+  Analyse preprocessed physiological signals and extracted features.
+
+  Accepted sources:
+    • Module 3 output folder (features_raw/, cleaned signals)
+    • Any folder with signal CSVs and feature CSVs
+""")
+    if not _ask_yn("Continue?", True):
+        return
+
+    source = _browse_data_folder("Module 3 output to analyse")
+    if source is None or not Path(source).exists():
+        print("  ✗  No valid source. Aborting.")
+        return
+
+    m4_params  = _collect_m4_params()
+    session_id = _ask("Session ID", Path(source).name)
+    user_id    = _ask("User ID", "user_001")
+
+    t0 = time.time()
+    run_module_4(
+        source               = source,
+        threshold_window_s   = m4_params["window_s"],
+        threshold_mad_factor = m4_params["mad_factor"],
+        threshold_sustain_s  = m4_params["sustain_s"],
+        session_id           = session_id,
+        user_id              = user_id,
+    )
+    elapsed = time.time() - t0
+    _section(f"✅  Analysis Complete  ({elapsed:.1f}s)")
+    _pause()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # TOP-LEVEL MENU
 # ─────────────────────────────────────────────────────────────────────────────
@@ -754,15 +855,18 @@ def main_menu():
     print("""
   Choose what to run.
 """)
-    idx = _choose("Select", range(3), [
-        "Full pipeline        —  M2 (acquire) → M3 (preprocess)",
+    idx = _choose("Select", range(4), [
+        "Full pipeline        —  M2 (acquire) → M3 (preprocess) → M4 (analyse)",
         "Data preprocessing   —  M3 only on existing data",
+        "Data analysis        —  M4 only on existing M3 output",
         "Exit",
     ])
     if idx == 0:
         run_full_pipeline()
     elif idx == 1:
         run_preprocessing_standalone()
+    elif idx == 2:
+        run_analysis_standalone()
     else:
         print("\n  Goodbye.\n")
 
@@ -775,12 +879,14 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--mode", default=None,
-                        choices=["full","preprocess","menu"])
+                        choices=["full","preprocess","analyse","menu"])
     args, _ = parser.parse_known_args()
 
     if args.mode == "full":
         run_full_pipeline()
     elif args.mode == "preprocess":
         run_preprocessing_standalone()
+    elif args.mode == "analyse":
+        run_analysis_standalone()
     else:
         main_menu()

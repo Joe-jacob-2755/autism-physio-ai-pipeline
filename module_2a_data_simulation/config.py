@@ -478,6 +478,52 @@ EMOTION_PROFILES: dict = {
             "jitter":            0.012,
         },
     },
+
+    # ─── Behavioural Targets (v1.2.0) ─────────────────────────────────────────
+    "SIB": {
+        "category":    "behavioural",
+        "description": "Self-injurious behaviour; repetitive motor, extreme arousal",
+        "color":       "#8B0000",
+        "valence":     "negative",
+        "arousal":     "very_high",
+        "EDA": {"tonic_delta": 5.8, "scr_amplitude_mean": 3.4,
+                "scr_amplitude_std": 0.8, "scr_rate_hz": 2.0,
+                "rise_time_s": 0.5, "recovery_factor": 0.10},
+        "BVP": {"hr_delta_bpm": 34.0, "hrv_factor": 0.38, "amplitude_factor": 1.35},
+        "IBI": {"delta_mean_ms": -195.0, "delta_std_ms": 18.0},
+        "ST":  {"delta_celsius": 0.55, "change_rate": 0.09},
+        "ACC": {"activity_amp": 3.2, "dominant_freq_hz": 2.5, "jitter": 0.30},
+    },
+
+    "ATO": {
+        "category":    "behavioural",
+        "description": "Aggression to others; explosive motor burst, fastest onset",
+        "color":       "#FF4500",
+        "valence":     "negative",
+        "arousal":     "very_high",
+        "EDA": {"tonic_delta": 5.2, "scr_amplitude_mean": 3.1,
+                "scr_amplitude_std": 0.7, "scr_rate_hz": 1.9,
+                "rise_time_s": 0.4, "recovery_factor": 0.15},
+        "BVP": {"hr_delta_bpm": 38.0, "hrv_factor": 0.35, "amplitude_factor": 1.40},
+        "IBI": {"delta_mean_ms": -218.0, "delta_std_ms": 24.0},
+        "ST":  {"delta_celsius": 0.70, "change_rate": 0.12},
+        "ACC": {"activity_amp": 4.0, "dominant_freq_hz": 4.5, "jitter": 0.70},
+    },
+
+    "GAB": {
+        "category":    "behavioural",
+        "description": "General aggressive behaviour; tantrums, property destruction",
+        "color":       "#FF6347",
+        "valence":     "negative",
+        "arousal":     "very_high",
+        "EDA": {"tonic_delta": 4.8, "scr_amplitude_mean": 2.9,
+                "scr_amplitude_std": 0.65, "scr_rate_hz": 1.7,
+                "rise_time_s": 0.6, "recovery_factor": 0.20},
+        "BVP": {"hr_delta_bpm": 32.0, "hrv_factor": 0.45, "amplitude_factor": 1.32},
+        "IBI": {"delta_mean_ms": -185.0, "delta_std_ms": 24.0},
+        "ST":  {"delta_celsius": 0.65, "change_rate": 0.11},
+        "ACC": {"activity_amp": 2.8, "dominant_freq_hz": 3.0, "jitter": 0.60},
+    },
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -488,9 +534,17 @@ EMOTIONS_ALL: list      = list(EMOTION_PROFILES.keys())
 EMOTIONS_AFFECTIVE: list = [
     k for k, v in EMOTION_PROFILES.items() if v["category"] == "affective"
 ]
-EMOTIONS_NEEDS: list    = [
+EMOTIONS_NEEDS: list       = [
     k for k, v in EMOTION_PROFILES.items() if v["category"] == "physiological_need"
 ]
+EMOTIONS_BEHAVIOURAL: list = [
+    k for k, v in EMOTION_PROFILES.items() if v["category"] == "behavioural"
+]
+TARGET_CATEGORIES: dict = {
+    "affective":          EMOTIONS_AFFECTIVE,
+    "physiological_need": EMOTIONS_NEEDS,
+    "behavioural":        EMOTIONS_BEHAVIOURAL,
+}
 
 SIGNAL_NAMES: list = ["EDA", "BVP", "IBI", "ST", "ACC_X", "ACC_Y", "ACC_Z"]
 ACC_AXES: list     = ["ACC_X", "ACC_Y", "ACC_Z"]
