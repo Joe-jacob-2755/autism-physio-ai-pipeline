@@ -147,7 +147,7 @@ class PreprocessingVisualiser:
 
         # Signal
         color = SIG_COLORS.get(sig_name, "#555555")
-        ds = 4 if sig_name == "BVP" else (2 if "ACC" in sig_name else 1)
+        ds = 8 if sig_name == "BVP" else (4 if "ACC" in sig_name else 1)
         ax_sig.plot(t[::ds], vals[::ds], color=color, lw=0.75, alpha=0.9)
         ax_sig.set_ylabel(SIG_YLABELS.get(sig_name, sig_name), fontsize=9)
         ax_sig.set_xlabel("Time (s)", fontsize=9)
@@ -200,7 +200,7 @@ class PreprocessingVisualiser:
             t = df[t_col].values if t_col else np.arange(len(df))
             vals = df[val_col].values
             color = SIG_COLORS.get(sig_name, "#555555")
-            ds = 4 if sig_name == "BVP" else 1
+            ds = 8 if sig_name == "BVP" else 2
             ax.plot(t[::ds], vals[::ds], color=color, lw=0.7)
             ax.set_ylabel(SIG_YLABELS.get(sig_name, sig_name), fontsize=8)
             ax.set_xlim(t[0], t[-1])
@@ -272,7 +272,7 @@ class PreprocessingVisualiser:
 
         # Raw
         color = SIG_COLORS.get(sig_name, "#555555")
-        ds = 4 if sig_name == "BVP" else 1
+        ds = 8 if sig_name == "BVP" else 2
         axes[1].plot(t_raw[::ds], raw[::ds], color="#AAAAAA", lw=0.6,
                      alpha=0.8, label="Raw")
         axes[1].set_ylabel(f"{SIG_YLABELS.get(sig_name, sig_name)}\n(raw)", fontsize=9)
@@ -342,7 +342,7 @@ class PreprocessingVisualiser:
             raw = raw_signals[sig_name][val_col].values
             proc = processed_signals[sig_name][val_col].values
             color = SIG_COLORS.get(sig_name, "#555555")
-            ds = 4 if sig_name == "BVP" else 1
+            ds = 8 if sig_name == "BVP" else 2
             ylabel = SIG_YLABELS.get(sig_name, sig_name)
 
             # Left: raw

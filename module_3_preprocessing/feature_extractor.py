@@ -601,46 +601,58 @@ class FeatureExtractor:
         """
         all_feats = {}
 
+        import time as _t
+
         # ── EDA ─────────────────────────────────────────────────────
         if "EDA" in signals:
+            self._log("  EDA  — extracting ...")
+            _t0 = _t.time()
             all_feats["EDA"] = self._extract_windowed(
                 signals["EDA"], "EDA_uS", "EDA",
                 self._extract_eda_window, session_id, user_id
             )
             self._log(f"  EDA: {len(all_feats['EDA'])} windows, "
-                      f"{all_feats['EDA'].shape[1]} columns")
+                      f"{all_feats['EDA'].shape[1]} cols  ({_t.time() - _t0:.1f}s)")
 
         # ── BVP ─────────────────────────────────────────────────────
         if "BVP" in signals:
+            self._log("  BVP  — extracting ...")
+            _t0 = _t.time()
             all_feats["BVP"] = self._extract_windowed(
                 signals["BVP"], "BVP_nT", "BVP",
                 self._extract_bvp_window, session_id, user_id
             )
             self._log(f"  BVP: {len(all_feats['BVP'])} windows, "
-                      f"{all_feats['BVP'].shape[1]} columns")
+                      f"{all_feats['BVP'].shape[1]} cols  ({_t.time() - _t0:.1f}s)")
 
         # ── IBI ─────────────────────────────────────────────────────
         if "IBI" in signals:
+            self._log("  IBI  — extracting ...")
+            _t0 = _t.time()
             all_feats["IBI"] = self._extract_ibi(
                 signals["IBI"], session_id, user_id)
             self._log(f"  IBI: {len(all_feats['IBI'])} windows, "
-                      f"{all_feats['IBI'].shape[1]} columns")
+                      f"{all_feats['IBI'].shape[1]} cols  ({_t.time() - _t0:.1f}s)")
 
         # ── ST ──────────────────────────────────────────────────────
         if "ST" in signals:
+            self._log("  ST   — extracting ...")
+            _t0 = _t.time()
             all_feats["ST"] = self._extract_windowed(
                 signals["ST"], "ST_degC", "ST",
                 self._extract_st_window, session_id, user_id
             )
             self._log(f"  ST: {len(all_feats['ST'])} windows, "
-                      f"{all_feats['ST'].shape[1]} columns")
+                      f"{all_feats['ST'].shape[1]} cols  ({_t.time() - _t0:.1f}s)")
 
         # ── ACC ─────────────────────────────────────────────────────
         if "ACC" in signals:
+            self._log("  ACC  — extracting ...")
+            _t0 = _t.time()
             all_feats["ACC"] = self._extract_acc(
                 signals["ACC"], session_id, user_id)
             self._log(f"  ACC: {len(all_feats['ACC'])} windows, "
-                      f"{all_feats['ACC'].shape[1]} columns")
+                      f"{all_feats['ACC'].shape[1]} cols  ({_t.time() - _t0:.1f}s)")
 
         return all_feats
 

@@ -164,6 +164,6 @@ DEMOGRAPHIC_ENCODINGS: dict = {
 }
 
 # ── Output configuration ──────────────────────────────────────────────────
-PLOT_DPI: int = 150
+PLOT_DPI: int = 100
 PLOT_STYLE: str = "seaborn-v0_8-whitegrid"
 FLOAT_FMT: str = "%.6f"
