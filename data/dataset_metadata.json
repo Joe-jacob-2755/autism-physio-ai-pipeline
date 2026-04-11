@@ -1,0 +1,14 @@
+{
+  "pipeline_run": "run_025",
+  "exported_at": "2026-04-11T09:15:50.816097",
+  "n_users": 2,
+  "user_ids": [
+    "user_002",
+    "user_003"
+  ],
+  "contents": {
+    "per_user": "Individual user feature sets with per-signal and combined CSVs",
+    "combined_all_users": "Cross-user aggregated features with per-window train/val/test split"
+  },
+  "fetch_url": "https://github.com/Joe-jacob-2755/autism-physio-ai-pipeline/tree/main/data"
+}

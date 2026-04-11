@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Dict
 from scipy.interpolate import interp1d
 
-from config import SAMPLING_RATES
+from config import SAMPLING_RATES, DEMOGRAPHIC_ENCODINGS
 from simulator import SimulationResult
 
 
@@ -65,6 +65,11 @@ class DataExporter:
 
         print("[Exporter] Writing metadata ...")
         saved["metadata"] = self.export_metadata()
+
+        print("[Exporter] Writing participant demographics ...")
+        demo_path = self.export_demographics()
+        if demo_path:
+            saved["demographics"] = demo_path
 
         return saved
 
@@ -259,6 +264,34 @@ class DataExporter:
         print(f"  [Exporter] Saved metadata.json")
         return out_path
 
+    # ── Participant Demographics CSV ─────────────────────────────────────────
+
+    def export_demographics(self) -> Path | None:
+        """
+        Write a single-row participant_demographics.csv with raw + encoded
+        demographic fields for this user.
+
+        Returns None if no UserProfile is attached to the SimulationResult.
+        """
+        up = self.result.user_profile
+        if up is None:
+            print("  [Exporter] No user profile — skipping demographics CSV")
+            return None
+
+        raw = up.demographic_dict()
+
+        # Build encoded columns
+        encoded = {}
+        for col, mapping in DEMOGRAPHIC_ENCODINGS.items():
+            raw_val = raw.get(col)
+            encoded[f"{col}_enc"] = mapping.get(raw_val, -1)
+
+        # Merge raw + encoded into one row
+        row = {"user_id": up.user_id, **raw, **encoded}
+        df = pd.DataFrame([row])
+
+        return self._write_df(df, "participant_demographics.csv")
+
     # ── Internal helper ───────────────────────────────────────────────────────
 
     def _write_df(self, df: pd.DataFrame, filename: str) -> Path:
@@ -359,5 +392,25 @@ def export_all_users_combined(
     sum_path = Path(run_folder) / "run_summary.csv"
     summary_df.to_csv(sum_path, index=False)
     print(f"  [Exporter] Saved run_summary.csv  ({len(summary_df)} users)")
+
+    # ── All-users demographics CSV ───────────────────────────────────────
+    demo_rows = []
+    for result in results:
+        up = result.user_profile
+        if up is None:
+            continue
+        raw = up.demographic_dict()
+        encoded = {}
+        for col, mapping in DEMOGRAPHIC_ENCODINGS.items():
+            raw_val = raw.get(col)
+            encoded[f"{col}_enc"] = mapping.get(raw_val, -1)
+        demo_rows.append({"user_id": up.user_id, **raw, **encoded})
+
+    if demo_rows:
+        demo_df = pd.DataFrame(demo_rows)
+        demo_path = Path(run_folder) / "all_users_demographics.csv"
+        demo_df.to_csv(demo_path, index=False)
+        print(f"  [Exporter] Saved all_users_demographics.csv  "
+              f"({len(demo_df)} users)")
 
     return out_path

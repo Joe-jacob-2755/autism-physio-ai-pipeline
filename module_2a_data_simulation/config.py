@@ -688,3 +688,32 @@ PARTICIPANT_DEMOGRAPHICS: dict = {
         "probabilities": [0.70, 0.30],  # ~70% have at least one comorbidity
     },
 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DEMOGRAPHIC FEATURE ENCODINGS
+# Ordinal encoding using clinically meaningful ordering.
+# These encodings are the single source of truth — downstream modules
+# (Module 3, Module 4) import or replicate these values.
+# ─────────────────────────────────────────────────────────────────────────────
+
+DEMOGRAPHIC_ENCODINGS: dict = {
+    "gender": {
+        "Male": 0, "Female": 1, "Non-binary": 2,
+    },
+    "autism_severity": {
+        "Low": 1, "Medium": 2, "Severe": 3,
+    },
+    "verbal_status": {
+        "Verbal": 0, "Minimally verbal": 1, "Non-verbal": 2,
+    },
+    "comorbidity": {
+        "Yes": 1, "No": 0,
+    },
+    "ethnicity": {
+        "White British": 0,
+        "Asian / Asian British": 1,
+        "Black / African / Caribbean": 2,
+        "Mixed / Multiple": 3,
+        "Other": 4,
+    },
+}

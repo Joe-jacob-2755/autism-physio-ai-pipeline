@@ -9,6 +9,14 @@ From the repo root, with the virtual environment active.
 =============================================================================
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "module_2a_data_simulation"))
+
+import pytest
+import pandas as pd
+import numpy as np
+
 from annotator import AutoAnnotator, compute_sqi
 from noise_injector import NoiseInjector
 from event_scheduler import (
@@ -20,12 +28,6 @@ from config import (
     SAMPLING_RATES, SIGNAL_RANGES, EMOTIONS_ALL,
     EMOTIONS_AFFECTIVE, EMOTIONS_NEEDS,
 )
-import pytest
-import pandas as pd
-import numpy as np
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "module_2a_data_simulation"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -67,7 +69,7 @@ def anger_result() -> SimulationResult:
 class TestConfig:
 
     def test_all_emotions_present(self):
-        assert len(EMOTIONS_ALL) == 10
+        assert len(EMOTIONS_ALL) == 13
 
     def test_affective_emotions(self):
         expected = {"Happy", "Anger", "Fear", "Disgust", "Sad", "Surprise"}

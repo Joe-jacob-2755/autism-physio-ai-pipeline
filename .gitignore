@@ -41,3 +41,9 @@ Thumbs.db
 module_4_data_analyser/outputs/
 outputs/
 */outputs/
+
+# ── Exception: data/ folder is tracked (final curated datasets) ──
+!data/
+!data/**
+!data/**/*.csv
+!data/**/*.json

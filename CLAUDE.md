@@ -818,6 +818,198 @@ pytest>=7.4.0        # Testing
 
 ---
 
+## Development Philosophy
+
+### Seven Principles for Clinical AI Pipeline Development
+
+These principles govern all development on this codebase. They are derived from IEC 62304 (medical device software), FDA Good Machine Learning Practice, and established scientific computing standards.
+
+**1. Every number has a provenance trail.**
+Every data point flowing through the pipeline must be traceable from raw sensor sample to final prediction. Log all transformations with timestamps, parameter values, and software versions. When a signal value changes (cleaning, filtering, feature extraction), record what changed it and why.
+
+**2. Determinism is non-negotiable.**
+Given the same input and seed, the pipeline must produce bit-identical output. All `np.random.Generator` instances must be seeded and passed explicitly — never rely on global random state. Pin all dependency versions.
+
+**3. Fail loudly on physiological implausibility.**
+Silent data corruption is the worst failure mode in clinical software. Validate signal ranges at every boundary. EDA cannot be negative. IBI cannot be 50 ms. If a value exits its physiological range after a transformation, raise an error — do not clamp and continue silently.
+
+**4. Defend the vulnerable population.**
+This pipeline processes data from non-verbal autistic children who cannot report errors. Performance must be validated per demographic subgroup: severity level, verbal status, age bracket. A model that works well on average but fails for severe/non-verbal participants is clinically dangerous.
+
+**5. Separate what you know from what you infer.**
+Raw signals, cleaned signals, extracted features, and model predictions are fundamentally different epistemic categories. Never mix them in the same DataFrame without explicit column naming. The `is_annotated` flag enforces the critical boundary between training data and deployment data.
+
+**6. Code review must verify numerical correctness, not just style.**
+For signal processing code, reviewers must check: filter stability, boundary effects, window alignment across sampling rates, and NaN propagation. A Butterworth filter with wrong cutoff silently degrades every downstream feature.
+
+**7. Design for the audit, not just the experiment.**
+Structure outputs so a regulatory reviewer or ethics board can, without running code, understand what happened: which data went in, what parameters were used, what came out, and what software version produced it. Auto-numbered output folders with full metadata serve this purpose. Never overwrite previous runs.
+
+---
+
+## Development Workflow
+
+### The Develop-Audit Ratchet
+
+This project follows a **develop-audit-advance** workflow that ensures quality gates at every step. The pattern prevents regressions and catches domain-specific issues that standard development practices miss.
+
+### Workflow Cycle — Tiered Audit System
+
+The workflow uses four tiers of review, triggered at different cadences depending on what's being built.
+
+```
+TIER 1 — EVERY FEATURE (core quality gate)
+  ├── Code Review Agent         — style, data integrity, performance, contracts
+  ├── Logic Review Agent        — signal processing, physiology, statistics
+  └── Security Audit Agent      — privacy, injection, dependencies
+
+TIER 2 — EVERY ML FEATURE (modules 5-7 only)
+  └── ML Experiment Validator   — leakage, stratification, class imbalance, metrics
+
+TIER 3 — EVERY 2 FEATURES (integration retro)
+  ├── Integration Architect     — cross-module contracts, output compatibility
+  └── Documentation Auditor     — CLAUDE.md drift, metadata completeness
+
+TIER 4 — MILESTONE GATES (before major releases)
+  ├── Deployment Readiness      — latency, recovery, edge viability, alerts
+  └── Frontend & Accessibility  — WCAG, clinical language, tablet UX
+```
+
+### Step-by-Step Protocol
+
+#### Phase 1: DEVELOP
+- Build the feature following the module structure and code standards
+- Write tests alongside the implementation
+- Run `python -m pytest tests/ -v --tb=short` — all tests must pass
+- Commit working code
+
+#### Phase 2: AUDIT (Single Feature)
+Run Tier 1 agents independently (they have no shared context to avoid bias):
+
+1. **Code Review** (`.agents/code-review.md`)
+   - Structure, style, data integrity, performance, inter-module contract
+
+2. **Logic Review** (`.agents/logic-review.md`)
+   - Signal processing validity, feature correctness, physiological plausibility
+
+3. **Security Audit** (`.agents/security-audit.md`)
+   - Data privacy, input validation, dependency safety, clinical data protection
+
+**If building an ML feature (Modules 5-7)**, also run:
+
+4. **ML Experiment Validator** (`.agents/ml-experiment-validator.md`)
+   - Data leakage prevention, stratification, class imbalance, experiment reproducibility
+
+#### Phase 3: FIX
+- Address all **CRITICAL** findings immediately
+- Address all **HIGH** findings before proceeding
+- **MEDIUM** findings: fix in the same cycle if quick, otherwise track for next cycle
+- **LOW** findings: document and address in batch cleanup cycles
+
+#### Phase 4: RETRO (Every Two Features)
+After every second feature, run Tier 3 agents on BOTH features together:
+
+5. **Integration Architect** (`.agents/integration-architect.md`)
+   - Cross-module data flow, PipelinePacket contracts, output format compatibility
+
+6. **Documentation & Compliance Auditor** (`.agents/documentation-compliance.md`)
+   - CLAUDE.md accuracy, metadata completeness, regulatory evidence trail
+
+This catches **integration drift** and **documentation rot** that single-feature audits miss.
+
+#### Phase 5: MILESTONE GATE (Before Releases)
+Before deployment or frontend milestones, run Tier 4 agents:
+
+7. **Deployment Readiness Reviewer** (`.agents/deployment-readiness.md`)
+   - Latency budgets, failure recovery, graceful degradation, edge deployment viability
+
+8. **Frontend & Accessibility Reviewer** (`.agents/frontend-accessibility.md`)
+   - WCAG 2.1 AA, clinical language, prediction uncertainty display, tablet responsiveness
+
+### Triggering Reviews
+
+**Automatic (during development cycle):**
+- Tier 1: After completing any feature, before marking it done
+- Tier 2: After completing any ML feature (Modules 5-7)
+- Tier 3: After completing every second feature, on the pair
+- Tier 4: Before any deployment or UI release milestone
+
+**Manual (anytime):**
+- When modifying existing modules → Tier 1
+- Before merging any branch → Tier 1
+- When changing shared infrastructure (`pipeline_main.py`, `PipelinePacket`, `config.py`) → Tier 1 + Tier 3
+- When adding or updating dependencies → Tier 1 (Security) + Tier 3 (Integration)
+- When touching any module's output format (contract change) → Tier 3 (Integration + Documentation)
+- When updating CLAUDE.md or README → Tier 3 (Documentation)
+
+### Audit Verdict Escalation
+
+| Agent Verdict | Action Required |
+|---------------|----------------|
+| APPROVE / SOUND / PASS / VALID / COHERENT / ACCURATE / CLINICALLY APPROPRIATE / PRODUCTION READY | Advance to next phase |
+| REQUEST CHANGES / REVISE / CONDITIONAL PASS / METHODOLOGICAL CONCERNS / DRIFT DETECTED / REVISIONS NEEDED / NEEDS HARDENING | Fix findings, re-run that agent |
+| BLOCK / REJECT / FAIL / INVALID / BROKEN CONTRACT / MISLEADING / UNSAFE FOR CLINICAL USE / NOT DEPLOYABLE | Stop. Fix all findings. Re-run ALL agents in the relevant tier |
+
+---
+
+## Review Agents
+
+Eight independent review agents live in `.agents/`. Each operates with NO prior context — they review only what the code says, preventing confirmation bias.
+
+### Tier 1 — Core Quality Gate (Every Feature)
+
+| Agent | File | Focus | Verdict |
+|-------|------|-------|---------|
+| **Code Review** | `.agents/code-review.md` | Quality, style, data integrity, performance, contracts | APPROVE / REQUEST CHANGES / BLOCK |
+| **Logic Review** | `.agents/logic-review.md` | Algorithms, physiology, math, statistics | SOUND / REVISE / REJECT |
+| **Security Audit** | `.agents/security-audit.md` | Privacy, injection, dependencies, clinical data | PASS / CONDITIONAL PASS / FAIL |
+
+### Tier 2 — ML Methodology (ML Features Only)
+
+| Agent | File | Focus | Verdict |
+|-------|------|-------|---------|
+| **ML Experiment Validator** | `.agents/ml-experiment-validator.md` | Leakage, stratification, imbalance, reproducibility, metrics | VALID / METHODOLOGICAL CONCERNS / INVALID |
+
+### Tier 3 — Integration & Documentation (Every 2 Features)
+
+| Agent | File | Focus | Verdict |
+|-------|------|-------|---------|
+| **Integration Architect** | `.agents/integration-architect.md` | Cross-module data flow, PipelinePacket contracts, output compatibility | COHERENT / DRIFT DETECTED / BROKEN CONTRACT |
+| **Documentation Auditor** | `.agents/documentation-compliance.md` | CLAUDE.md accuracy, metadata completeness, regulatory evidence | ACCURATE / DRIFT DETECTED / MISLEADING |
+
+### Tier 4 — Milestone Gates (Before Releases)
+
+| Agent | File | Focus | Verdict |
+|-------|------|-------|---------|
+| **Deployment Readiness** | `.agents/deployment-readiness.md` | Latency, recovery, degradation, edge viability, alerts | PRODUCTION READY / NEEDS HARDENING / NOT DEPLOYABLE |
+| **Frontend & Accessibility** | `.agents/frontend-accessibility.md` | WCAG 2.1, clinical language, uncertainty display, tablet UX | CLINICALLY APPROPRIATE / REVISIONS NEEDED / UNSAFE FOR CLINICAL USE |
+
+### Why Eight Separate Agents?
+
+1. **Separation of concerns**: Each agent owns a distinct expertise domain — code quality, physiological correctness, security, ML methodology, systems integration, documentation accuracy, production operations, and clinical UX.
+2. **No bias**: Each agent starts fresh — no memory of design discussions, no attachment to implementation decisions.
+3. **Tiered efficiency**: Not all agents run every time. Core agents run on every feature; specialist agents activate only when their domain is relevant.
+4. **Complete lifecycle coverage**: The eight agents together cover build → validate → integrate → deploy → present — the full clinical AI pipeline lifecycle.
+
+---
+
+## Development Rules
+
+Six rule files in `.claude/rules/` codify the non-negotiable standards:
+
+| Rule | File | Summary |
+|------|------|---------|
+| Clinical Data Integrity | `01-clinical-data-integrity.md` | Validate ranges, no silent drops, preserve timestamps, NaN handling |
+| Reproducibility | `02-reproducibility.md` | Seeded randomness, versioned outputs, full parameter recording |
+| Module Contract | `03-module-contract.md` | PipelinePacket only, isolated imports, annotation routing |
+| Numerical Safety | `04-numerical-safety.md` | NumPy 2.x compat, division guards, filter stability, float tolerance |
+| Testing Standards | `05-testing-standards.md` | Every module tested, deterministic, plausibility checks |
+| Security Baseline | `06-security-baseline.md` | No eval/pickle on untrusted input, path validation, data minimisation |
+
+These rules are enforced by the review agents during every audit cycle.
+
+---
+
 ## Glossary
 
 | Term | Definition |

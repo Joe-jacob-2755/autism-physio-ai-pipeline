@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autism Physio-AI Pipeline — Process Flowchart</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    padding: 24px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    color: #58a6ff;
+    margin-bottom: 8px;
+  }
+  h2 {
+    text-align: center;
+    font-size: 16px;
+    color: #8b949e;
+    margin-bottom: 32px;
+    font-weight: 400;
+  }
+  h3 {
+    font-size: 22px;
+    color: #f0883e;
+    margin: 40px 0 16px;
+    padding-left: 12px;
+    border-left: 4px solid #f0883e;
+  }
+  .chart-container {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 24px;
+    margin: 16px 0;
+    overflow-x: auto;
+  }
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+    margin: 24px 0;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+  }
+  .legend-symbol {
+    width: 40px;
+    height: 28px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .output-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+  }
+  .output-table th, .output-table td {
+    padding: 10px 14px;
+    border: 1px solid #30363d;
+    text-align: left;
+  }
+  .output-table th {
+    background: #161b22;
+    color: #58a6ff;
+    font-weight: 600;
+  }
+  .output-table tr:nth-child(even) { background: #0d1117; }
+  .output-table tr:nth-child(odd) { background: #161b22; }
+  .mermaid { text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Autism Physio-AI Pipeline</h1>
+<h2>Detailed Process Flowchart &mdash; Modules 2A, 1, 3, 4, 5</h2>
+
+<!-- ====================================================================== -->
+<!-- LEGEND -->
+<!-- ====================================================================== -->
+<div class="legend">
+  <div class="legend-item">
+    <div class="legend-symbol" style="background:#e94560;border-radius:50%;"></div>
+    <span><strong>Start / End</strong> &mdash; Terminal points</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-symbol" style="background:#e94560;clip-path:polygon(10% 0, 90% 0, 100% 100%, 0 100%);"></div>
+    <span><strong>Module Header</strong> &mdash; Module entry point</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-symbol" style="background:#16213e;border:2px solid #0f3460;"></div>
+    <span><strong>Process</strong> &mdash; Processing step</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-symbol" style="background:#533483;border:1px solid #7b2cbf;"></div>
+    <span><strong>Sub-process</strong> &mdash; Step within a process</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-symbol" style="background:#e94560;clip-path:polygon(50% 0, 100% 50%, 50% 100%, 0 50%);"></div>
+    <span><strong>Decision</strong> &mdash; Routing / branching logic</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-symbol" style="background:#0f3460;clip-path:polygon(15% 0, 100% 0, 85% 100%, 0 100%);"></div>
+    <span><strong>Data</strong> &mdash; Input data</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-symbol" style="background:#1b4332;border:2px solid #40916c;"></div>
+    <span><strong>Output</strong> &mdash; Output files / artefacts</span>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- OVERVIEW FLOWCHART -->
+<!-- ====================================================================== -->
+<h3>High-Level Pipeline Overview</h3>
+<div class="chart-container">
+<pre class="mermaid">
+flowchart LR
+    classDef modBox fill:#16213e,stroke:#58a6ff,color:#fff,stroke-width:2px,font-size:14px
+    classDef outBox fill:#1b4332,stroke:#40916c,color:#fff,stroke-width:1px
+    classDef futBox fill:#30363d,stroke:#8b949e,color:#8b949e,stroke-width:1px,stroke-dasharray:5
+
+    START(((START))) --> M2A
+    M2A["Module 2A\nData Simulation\nv1.1.0"]:::modBox --> O2A[/"Per-signal CSVs\ncombined_signals.csv\nannotations\nmetadata.json"/]:::outBox
+    O2A --> M1
+    M1["Module 1\nData Acquisition\nv1.0.0"]:::modBox --> D1{{"is_annotated?"}}
+    D1 -->|"True"| O1T[/"PipelinePacket\n(Training)"/]:::outBox
+    D1 -->|"False"| M9["Module 9\nDeployment\n(Planned)"]:::futBox
+    O1T --> M3
+    M3["Module 3\nPreprocessing\nv1.0.0"]:::modBox --> O3[/"Cleaned signals\nFeature CSVs\n(raw + normalised)"/]:::outBox
+    O3 --> M4
+    O3 --> M5A
+    M4["Module 4\nFeature Engineering\nv1.0.0"]:::modBox --> O4[/"Engineered features\nSelected features\nPCA/PLS-VIP\nfitted_scaler.joblib"/]:::outBox
+    O4 --> M5T["Module 5\nModel Training\n(Planned)"]:::futBox
+    M5A["Module 5\nData Analyser\nv1.0.0"]:::modBox --> O5A[/"analysis_report.html\nStatistical tables\nPlots"/]:::outBox
+    O5A --> END(((END)))
+</pre>
+</div>
+
+<!-- ====================================================================== -->
+<!-- MODULE 2A -->
+<!-- ====================================================================== -->
+<h3>Module 2A &mdash; Data Simulation (7 Steps)</h3>
+<div class="chart-container">
+<pre class="mermaid">
+flowchart TD
+    classDef proc fill:#16213e,stroke:#0f3460,color:#fff,stroke-width:2px
+    classDef sub fill:#533483,stroke:#7b2cbf,color:#fff,stroke-width:1px
+    classDef out fill:#1b4332,stroke:#40916c,color:#fff,stroke-width:2px
+    classDef data fill:#0f3460,stroke:#533483,color:#fff,stroke-width:2px
+    classDef head fill:#e94560,stroke:#1a1a2e,color:#fff,stroke-width:3px
+
+    HEAD[/"MODULE 2A &mdash; Data Simulation v1.1.0"\]:::head
+    HEAD --> INPUT[/"Inputs:\nduration_s, n_events,\nevent_duration_s, emotions[],\nnoise_level, seed, n_users"/]:::data
+
+    INPUT --> S1["Step 1: UserProfileGenerator\nDraw from POPULATION distributions\n(age 5-15, gender 75/22/3%,\nseverity Low/Med/Severe,\nverbal 55/25/20%)"]:::proc
+    S1 --> O1[/"UserProfile objects\n- Baseline physiology params\n- demographic_dict()"/]:::out
+
+    O1 --> S2["Step 2: EventScheduler\nPlace non-overlapping events\n(min_gap_s between events,\nmin_lead_s before first event)"]:::proc
+    S2 --> O2[/"EventConfig list\n(emotion, start_s, end_s,\nevent_id, duration_s)"/]:::out
+
+    O2 --> S3["Step 3: Baseline Signal Generation"]:::proc
+    subgraph S3_DETAIL ["Signal Models"]
+        direction LR
+        S3A["EDA: SCL tonic\n(drift + respiration)"]:::sub
+        S3B["BVP: 3-Gaussian\nPPG morphology"]:::sub
+        S3C["IBI: AR(1) HRV\nmodel"]:::sub
+        S3D["ST: thermal\ndrift model"]:::sub
+        S3E["ACC: gravity +\nbreathing artefact"]:::sub
+    end
+    S3 --> O3[/"Raw baseline signals\nEDA@4Hz, BVP@64Hz,\nIBI@event, ST@4Hz,\nACC@32Hz x 3 axes"/]:::out
+
+    O3 --> S4["Step 4: Event Modulation\nApply 10 emotion profiles\n(valence-arousal mapped)\nSeverity scaling:\nLow=1.0x, Med=1.3x, Severe=1.6x\nAge effect: +1.2 bpm/yr younger"]:::proc
+    S4 --> O4[/"Modulated signals\n(emotion-specific patterns\nin event windows)"/]:::out
+
+    O4 --> S5["Step 5: NoiseInjector\nEDA: drift + powerline (50Hz)\nBVP: motion + baseline wander\nACC: correlated cross-axis vibration\nTiers: low / medium / high"]:::proc
+    S5 --> O5[/"Noisy signals"/]:::out
+
+    O5 --> S6["Step 6: Clip & Validate\nEnforce physiological ranges:\nEDA: 0.01-30 uS\nBVP: -300 to +300 nT\nIBI: 300-1500 ms\nST: 25-40 C | ACC: -4 to +4 g"]:::proc
+    S6 --> O6[/"Validated signals"/]:::out
+
+    O6 --> S7["Step 7: AutoAnnotator\n- Event-level labels\n- SQI (0-1) per 10s window\n- Sample-level target_label\n- Baseline window markers"]:::proc
+    S7 --> OUTPUT
+
+    OUTPUT[/"OUTPUTS --> M1:\nEDA.csv, BVP.csv, IBI.csv,\nST.csv, ACC.csv\ncombined_signals.csv (64 Hz)\nannotations_events.csv\nannotations_signal_quality.csv\nannotations_sample_labels.csv\nmetadata.json\nsignal_*.png"/]:::out
+</pre>
+</div>
+
+<!-- ====================================================================== -->
+<!-- MODULE 1 -->
+<!-- ====================================================================== -->
+<h3>Module 1 &mdash; Data Acquisition (4 Modes)</h3>
+<div class="chart-container">
+<pre class="mermaid">
+flowchart TD
+    classDef proc fill:#16213e,stroke:#0f3460,color:#fff,stroke-width:2px
+    classDef dec fill:#e94560,stroke:#1a1a2e,color:#fff,stroke-width:2px
+    classDef out fill:#1b4332,stroke:#40916c,color:#fff,stroke-width:2px
+    classDef data fill:#0f3460,stroke:#533483,color:#fff,stroke-width:2px
+    classDef head fill:#e94560,stroke:#1a1a2e,color:#fff,stroke-width:3px
+    classDef fut fill:#30363d,stroke:#8b949e,color:#8b949e,stroke-dasharray:5
+
+    HEAD[/"MODULE 1 &mdash; Data Acquisition v1.0.0"\]:::head
+    HEAD --> MODE{{"Select Acquisition Mode"}}:::dec
+
+    MODE -->|"Mode 2.1\nImport"| M1["DataImporter\nLoad existing CSVs/folders\nAuto-detect 4 layouts:\n- M1A output structure\n- Individual signal files\n- Combined-only CSV\n- Single CSV"]:::proc
+
+    MODE -->|"Mode 2.2\nSimulate"| M2["SimulationConnector\nCall Module 2A in-process\n(via _isolated_import)\nInteractiveSimSetup for\nguided configuration"]:::proc
+
+    MODE -->|"Mode 2.3\nLive"| M3["LiveDataCollector\nFileStreamAdapter (replay CSV\nat configurable speed) OR\nEmpaticaE4Adapter (BLE TCP\n127.0.0.1:28000)\n+ SessionAnnotator\n(real-time keyboard labels)"]:::proc
+
+    MODE -->|"Mode 2.4\nDeployment"| M4["DeploymentIngester\nStrip target_label columns\nSet is_annotated = False\n(route to Module 9)"]:::proc
+
+    M1 --> PACKET["Build PipelinePacket\nsignals: Dict[str, DataFrame]\ncombined: DataFrame (64 Hz)\nmetadata: dict\nsource_type: 'imported'|'simulated'|\n  'live'|'deployment'\nis_annotated: bool\nsession_id, user_id"]:::proc
+    M2 --> PACKET
+    M3 --> PACKET
+    M4 --> PACKET
+
+    PACKET --> ROUTE{{"is_annotated?"}}:::dec
+
+    ROUTE -->|"True\n(Training Path)"| OUT_T[/"OUTPUTS --> M3:\nPipelinePacket\n+ EDA.csv ... ACC.csv\n+ combined_signals.csv\n+ packet_metadata.json\n+ module2_run_summary.json"/]:::out
+
+    ROUTE -->|"False\n(Deployment Path)"| OUT_D[/"OUTPUT --> M9:\nPipelinePacket\n(no labels, inference only)"/]:::out
+
+    OUT_D --> M9["Module 9\nDeployment & Inference\n(Planned)"]:::fut
+</pre>
+</div>
+
+<!-- ====================================================================== -->
+<!-- MODULE 3 -->
+<!-- ====================================================================== -->
+<h3>Module 3 &mdash; Data Preprocessing (6 Steps)</h3>
+<div class="chart-container">
+<pre class="mermaid">
+flowchart TD
+    classDef proc fill:#16213e,stroke:#0f3460,color:#fff,stroke-width:2px
+    classDef sub fill:#533483,stroke:#7b2cbf,color:#fff,stroke-width:1px
+    classDef out fill:#1b4332,stroke:#40916c,color:#fff,stroke-width:2px
+    classDef data fill:#0f3460,stroke:#533483,color:#fff,stroke-width:2px
+    classDef head fill:#e94560,stroke:#1a1a2e,color:#fff,stroke-width:3px
+    classDef dec fill:#e94560,stroke:#1a1a2e,color:#fff,stroke-width:2px
+
+    HEAD[/"MODULE 3 &mdash; Data Preprocessing v1.0.0"\]:::head
+    HEAD --> INPUT[/"Inputs:\nPipelinePacket | folder path |\ndict of DataFrames\n+ demographics"/]:::data
+
+    INPUT --> S1["Step 1: SignalCleaner"]:::proc
+    subgraph S1D ["Cleaning Rules"]
+        direction LR
+        S1A["Missing > 70%\n--> DISCARD channel"]:::sub
+        S1B["Missing < 70%\n--> linear interpolation"]:::sub
+        S1C["Out-of-range\n--> NaN --> re-fill"]:::sub
+        S1D2["Flatline detection\n(> 5s constant)"]:::sub
+    end
+    S1 --> O1[/"CleaningReport per channel\n(n_missing, n_oor, n_flat,\nn_discarded, n_interpolated)"/]:::out
+
+    O1 --> S2["Step 2: SignalFilterManager"]:::proc
+    subgraph S2D ["Two-Stage Filtering"]
+        direction LR
+        S2A["Stage A: Hampel filter\n(sliding MAD, optional)\nRemove impulse artefacts"]:::sub
+        S2B["Stage B: Main filter"]:::sub
+    end
+
+    S2 --> FTYPE{{"Filter Type?"}}:::dec
+    FTYPE -->|"butterworth"| BW["Butterworth zero-phase\nEDA: LP 1.0 Hz\nBVP: BP 0.5-8.0 Hz\nST: LP 0.1 Hz\nACC: BP 0.1-15.0 Hz"]:::sub
+    FTYPE -->|"kalman"| KF["Kalman RTS smoother\n(optimal for EDA/ST)"]:::sub
+
+    BW --> O2[/"Filtered signals"/]:::out
+    KF --> O2
+
+    O2 --> S3["Step 3: FeatureExtractor\n60s window, 50% overlap\n80 features per window\n(18 EDA + 13 BVP + 17 IBI +\n10 ST + 14 ACC + 8 ACC variants)"]:::proc
+    S3 --> O3[/"Per-signal feature DataFrames\n(one row per window)"/]:::out
+
+    O3 --> S4["Step 4: DemographicEncoder\nOrdinal encoding:\nage (continuous)\ngender: M=0, F=1, NB=2\nseverity: L=1, M=2, S=3\nverbal: V=0, MV=1, NV=2\ncomorbidity: No=0, Yes=1"]:::proc
+    S4 --> O4[/"Feature DFs +\ndemographic columns appended"/]:::out
+
+    O4 --> S5["Step 5: FeatureNormaliser\nRobustScaler (median + IQR)\n+ FeatureFuser\n(merge_asof, 30s tolerance,\nwindow alignment across signals)"]:::proc
+    S5 --> O5[/"Per-signal (raw + norm)\nCombined (raw + norm)\nFitted scaler object"/]:::out
+
+    O5 --> S6["Step 6: Visualiser + Exporter"]:::proc
+    subgraph S6D ["Output Generation"]
+        direction LR
+        S6A["Processed signal plots\n(with event timeline bar)"]:::sub
+        S6B["Raw vs processed\ncomparison plots\n(SNR gain annotation)"]:::sub
+        S6C["CSV export\n(4 sets: raw/norm x\nindividual/combined)"]:::sub
+    end
+
+    S6 --> OUTPUT
+
+    OUTPUT[/"OUTPUTS --> M4 + M5 Analyser:\n--- features_raw/ ---\nEDA_features.csv, BVP_features.csv\nIBI_features.csv, ST_features.csv\nACC_features.csv\ncombined_features.csv\n--- features_normalised/ ---\n*_features_norm.csv\ncombined_features_norm.csv\n--- Plots ---\nprocessed_*.png, comparison_*.png\n--- Reports ---\ncleaning_report.csv\npreprocessing_metadata.json"/]:::out
+</pre>
+</div>
+
+<!-- ====================================================================== -->
+<!-- MODULE 4 -->
+<!-- ====================================================================== -->
+<h3>Module 4 &mdash; Feature Engineering (7 Steps)</h3>
+<div class="chart-container">
+<pre class="mermaid">
+flowchart TD
+    classDef proc fill:#16213e,stroke:#0f3460,color:#fff,stroke-width:2px
+    classDef sub fill:#533483,stroke:#7b2cbf,color:#fff,stroke-width:1px
+    classDef out fill:#1b4332,stroke:#40916c,color:#fff,stroke-width:2px
+    classDef data fill:#0f3460,stroke:#533483,color:#fff,stroke-width:2px
+    classDef head fill:#e94560,stroke:#1a1a2e,color:#fff,stroke-width:3px
+    classDef fut fill:#30363d,stroke:#8b949e,color:#8b949e,stroke-dasharray:5
+
+    HEAD[/"MODULE 4 &mdash; Feature Engineering v1.0.0"\]:::head
+    HEAD --> INPUT[/"Input:\nM3 cleaned signals folder |\nDict of DataFrames\n+ demographics (auto-loaded\nfrom metadata.json)"/]:::data
+
+    INPUT --> S1["Step 1: FeatureExtractor\n93 features total (windowed)\nEDA: 22 features\nBVP: 16 features\nIBI: 17 features\nST: 12 features\nACC: 26 features"]:::proc
+
+    subgraph S1D ["Feature Categories"]
+        direction LR
+        S1A["Level 1: Derived\nSCL/SCR, beat morphology,\nHRV time-domain, SVM,\nthermal delta"]:::sub
+        S1B["Level 2: Time domain\nmean, std, skew, kurtosis,\nrange, ZCR"]:::sub
+        S1C["Level 2: Frequency\nband powers, spectral\ncentroid, spectral entropy,\ndominant frequency"]:::sub
+        S1D2["Level 2: Non-linear\nsample entropy, DFA\nalpha1, Poincare SD1/SD2"]:::sub
+    end
+
+    S1 --> O1[/"Per-signal feature DFs\n(one row per window)"/]:::out
+
+    O1 --> S2["Step 2: Demographics Check\nValidate participant demographics\navailable from metadata"]:::proc
+    S2 --> O2[/"Demographics dict validated"/]:::out
+
+    O2 --> S3["Step 3: FeatureNormaliser\nRobustScaler (default)\nPer-signal fit_transform\nNaN/inf --> median fill\nSave fitted_scaler.joblib"]:::proc
+    S3 --> O3[/"Normalised per-signal DFs\nfitted_scaler.joblib"/]:::out
+
+    O3 --> S4["Step 4: FeatureFuser\nDemographicEncoder (ordinal)\n+ merge_asof alignment\n(30s tolerance)\nSingle entry point for\ndemographics injection"]:::proc
+    S4 --> O4[/"raw_features (per-signal + combined)\nnorm_features (per-signal + combined)"/]:::out
+
+    O4 --> S5["Step 5: OneHotEncoder\nCategorical --> binary indicators\ngender: Male/Female/Non-binary\nethnicity: 5 categories\nseverity: Low/Medium/Severe\nverbal: Verbal/Min verbal/Non-verbal\ncomorbidity: Yes/No"]:::proc
+    S5 --> O5[/"encoded_features (per-signal)\nencoded_combined"/]:::out
+
+    O5 --> S6["Step 6: FeatureSelector\nEnsemble ranking:\n(1) Mutual Information\n(2) Random Forest importance\n(3) F-statistic (ANOVA)\n(4) Variance threshold\nAverage normalised ranks\n--> Select top N"]:::proc
+    S6 --> O6[/"feature_importance.csv\ntop_N_features.csv\ntop_N_features_encoded.csv"/]:::out
+
+    O6 --> S7["Step 7: DimensionalityReducer"]:::proc
+    subgraph S7D ["Three Methods Compared"]
+        direction LR
+        S7A["PCA\n(unsupervised)\nRetain 95% variance"]:::sub
+        S7B["PLS-VIP\n(supervised)\nVIP >= 1.0 = important"]:::sub
+        S7C["Truncated SVD\n(no centring)\nCompare components"]:::sub
+    end
+
+    S7 --> OUTPUT
+
+    OUTPUT[/"OUTPUTS --> M5 Training (Planned):\n--- features_raw/ ---\n*_features.csv, combined_features.csv\n--- features_normalised/ ---\n*_features_norm.csv, combined_features_norm.csv\n--- features_encoded/ ---\n*_features_encoded.csv\ncombined_features_encoded.csv\n--- features_selected/ ---\nfeature_importance.csv\ntop_N_features.csv, top_N_features_encoded.csv\n--- dimensionality_reduction/ ---\npca_components.csv, pca_transformed.csv\npca_explained_variance.csv\npls_vip_scores.csv, svd_transformed.csv\ncomparison_report.json\n--- fitted_scaler.joblib ---\n--- feature_engineering_metadata.json ---"/]:::out
+</pre>
+</div>
+
+<!-- ====================================================================== -->
+<!-- MODULE 5 ANALYSER -->
+<!-- ====================================================================== -->
+<h3>Module 5 &mdash; Data Analyser (5 Steps)</h3>
+<div class="chart-container">
+<pre class="mermaid">
+flowchart TD
+    classDef proc fill:#16213e,stroke:#0f3460,color:#fff,stroke-width:2px
+    classDef sub fill:#533483,stroke:#7b2cbf,color:#fff,stroke-width:1px
+    classDef out fill:#1b4332,stroke:#40916c,color:#fff,stroke-width:2px
+    classDef data fill:#0f3460,stroke:#533483,color:#fff,stroke-width:2px
+    classDef head fill:#e94560,stroke:#1a1a2e,color:#fff,stroke-width:3px
+
+    HEAD[/"MODULE 5 &mdash; Data Analyser v1.0.0"\]:::head
+    HEAD --> INPUT[/"Input:\nM3 output folder (signals +\nfeatures_raw/) | Dict of DFs"/]:::data
+
+    INPUT --> S1["Step 1: Data Loading\nLoad signal CSVs (EDA...ACC)\n+ feature CSVs from features_raw/\n+ combined features\nFallback: reconstruct from\nfeature means if raw unavailable"]:::proc
+    S1 --> O1[/"signals_dict\nfeatures_dict\ncombined_df"/]:::out
+
+    O1 --> S2["Step 2: SignalAnalyser\nTemporal Dynamics Analysis"]:::proc
+    subgraph S2D ["Event-Level Analysis"]
+        direction TB
+        S2A["Extract per-event segments\nfrom annotated signals\n(event_id, target_label,\nstart_s, end_s)"]:::sub
+        S2A --> S2B["Per event x signal:\nBaseline: 30s pre-event\nmedian + std"]:::sub
+        S2B --> S2C["Peak detection:\npeak value, time-to-peak,\n% change from baseline,\npeak alignment with event"]:::sub
+        S2C --> S2D2["Recovery analysis:\ntime to subside (50% return)\nreturn to baseline check\npost-event median drift"]:::sub
+        S2D2 --> S2E["Adaptive threshold detection:\nrunning median +/- N x MAD\n(300s window, 3x MAD,\nmin 30s sustained)"]:::sub
+    end
+    S2 --> O2[/"event_dynamics DF\nmedian_drift DFs\nreturn_summary DF\nthreshold_events DF"/]:::out
+
+    O2 --> S3["Step 3: Statistical Analyses"]:::proc
+    subgraph S3D ["6 Statistical Tests"]
+        direction TB
+        S3A["Descriptive statistics:\nper-target mean, std, median,\nIQR, min, max, CV"]:::sub
+        S3A --> S3B["Kruskal-Wallis H-test:\nnon-parametric across all targets\n+ eta-squared effect size"]:::sub
+        S3B --> S3C["Pairwise Mann-Whitney U:\ntop features, all target pairs\nBonferroni corrected (alpha=0.05)"]:::sub
+        S3C --> S3D2["Spearman correlation:\nfeatures vs ordinal-encoded\ntarget label"]:::sub
+        S3D2 --> S3E["Feature-feature correlation:\nSpearman matrix, top 30\nfeatures by variance"]:::sub
+        S3E --> S3F["Signal % change summary:\nmean/median/min/max\nper signal x target"]:::sub
+    end
+    S3 --> O3[/"descriptive_df\nkruskal_df\npairwise_df\ncorr_target_df\ncorr_matrix_df\npct_change_df"/]:::out
+
+    O3 --> S4["Step 4: AnalysisVisualiser\nGenerate 10 plot types"]:::proc
+    subgraph S4D ["Plot Types"]
+        direction TB
+        S4A["1. Descriptive boxplots\n(per signal, top features)"]:::sub
+        S4A --> S4B["2. % change from baseline\n(bar charts per signal)"]:::sub
+        S4B --> S4C["3. Temporal dynamics\n(time-to-peak, subside, return)"]:::sub
+        S4C --> S4D2["4. Return-to-median rate\n5. Kruskal-Wallis features"]:::sub
+        S4D2 --> S4E["6. Feature-target correlation\n7. Feature-feature heatmap"]:::sub
+        S4E --> S4F["8. Threshold overlay\n9. 3D time-sync projection\n10. Median drift"]:::sub
+    end
+    S4 --> O4[/"10+ PNG plots\n3d_signals.html (Plotly)"/]:::out
+
+    O4 --> S5["Step 5: AnalysisReporter\nGenerate comprehensive\nHTML report + CSV tables\nAuto-generated insights\nEmbedded plots"]:::proc
+    S5 --> OUTPUT
+
+    OUTPUT[/"OUTPUTS (Terminal):\n--- Report ---\nanalysis_report.html\nanalysis_metadata.json\n--- Plots ---\ndescriptive_boxplot_*.png\npct_change_from_baseline.png\ntemporal_dynamics.png\nreturn_to_median_rate.png\nsignificant_features_kruskal.png\ncorrelation_feature_target.png\ncorrelation_matrix.png\nthreshold_*.png\nmedian_drift.png\n3d_signals.html + .png\n--- summary_tables/ ---\ndescriptive_statistics.csv\nkruskal_wallis_results.csv\npairwise_mannwhitney.csv\ncorrelation_feature_target.csv\ncorrelation_matrix.csv\ntemporal_dynamics.csv\nreturn_to_median_summary.csv\npct_change_summary.csv\nthreshold_events.csv"/]:::out
+</pre>
+</div>
+
+<!-- ====================================================================== -->
+<!-- OUTPUT FORWARD PATHS TABLE -->
+<!-- ====================================================================== -->
+<h3>Output Forward Paths</h3>
+<table class="output-table">
+<thead>
+<tr><th>Source Module</th><th>Key Output</th><th>Consumed By</th><th>Purpose</th></tr>
+</thead>
+<tbody>
+<tr><td>M2A Simulation</td><td>Per-signal CSVs + annotations</td><td>M1 (Mode 2.2)</td><td>Synthetic training data</td></tr>
+<tr><td>M2A Simulation</td><td>metadata.json (demographics)</td><td>M3 / M4</td><td>Participant demographics</td></tr>
+<tr><td>M1 Acquisition</td><td>PipelinePacket (annotated=True)</td><td>M3 Preprocessing</td><td>Training/evaluation path</td></tr>
+<tr><td>M1 Acquisition</td><td>PipelinePacket (annotated=False)</td><td>M9 Deployment (planned)</td><td>Live inference path</td></tr>
+<tr><td>M3 Preprocessing</td><td>features_raw/*.csv</td><td>M4 Feature Engineering</td><td>Base features for engineering</td></tr>
+<tr><td>M3 Preprocessing</td><td>Signal CSVs + features_raw/</td><td>M5 Data Analyser</td><td>Statistical analysis input</td></tr>
+<tr><td>M3 Preprocessing</td><td>features_normalised/*.csv</td><td>M4 Feature Engineering</td><td>Pre-normalised features</td></tr>
+<tr><td>M4 Feature Eng.</td><td>top_N_features.csv</td><td>M5 Model Training (planned)</td><td>Selected feature subset</td></tr>
+<tr><td>M4 Feature Eng.</td><td>combined_features_encoded.csv</td><td>M5 Model Training (planned)</td><td>Early fusion model input</td></tr>
+<tr><td>M4 Feature Eng.</td><td>*_features_encoded.csv (per-signal)</td><td>M5 Model Training (planned)</td><td>Unimodal model inputs</td></tr>
+<tr><td>M4 Feature Eng.</td><td>pls_vip_scores.csv</td><td>M5 Model Training (planned)</td><td>Feature importance guidance</td></tr>
+<tr><td>M4 Feature Eng.</td><td>fitted_scaler.joblib</td><td>M5 Training / M9 Deployment</td><td>Consistent normalisation</td></tr>
+<tr><td>M5 Analyser</td><td>analysis_report.html</td><td>Researcher</td><td>Interpretation &amp; validation</td></tr>
+<tr><td>M5 Analyser</td><td>kruskal_wallis_results.csv</td><td>Researcher / M5 Training</td><td>Feature discriminative power</td></tr>
+</tbody>
+</table>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'dark',
+  flowchart: {
+    useMaxWidth: true,
+    htmlLabels: true,
+    curve: 'basis',
+    nodeSpacing: 30,
+    rankSpacing: 40,
+  },
+  themeVariables: {
+    primaryColor: '#16213e',
+    primaryTextColor: '#c9d1d9',
+    primaryBorderColor: '#0f3460',
+    lineColor: '#58a6ff',
+    secondaryColor: '#533483',
+    tertiaryColor: '#1b4332',
+    fontSize: '14px',
+  }
+});
+</script>
+
+</body>
+</html>

@@ -202,7 +202,7 @@ class SimulationConnector:
 
             packet = self._result_to_packet(result)
             packets.append(packet)
-            self._log(f"  {profile.user_id} → PipelinePacket [{packet.session_id}]")
+            self._log(f"  {profile.user_id} -> PipelinePacket [{packet.session_id}]")
 
         elapsed = time.time() - t0
         self._log(

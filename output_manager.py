@@ -12,33 +12,36 @@ Every pipeline run writes ALL outputs to one numbered folder:
             module_1_acquisition/user_001/
                 EDA.csv  BVP.csv  IBI.csv  ST.csv  ACC.csv
                 combined_signals.csv  packet_metadata.json
-            module_2a_simulation/user_001/       (if simulation used)
-                EDA.csv  BVP.csv  ...  metadata.json
-                annotations_events.csv  signal_EDA.png ...
-            module_3_preprocessing/user_001/
-                features_raw/
-                    EDA_features.csv ... combined_features.csv
-                features_normalised/
-                    EDA_features_norm.csv ... combined_features_norm.csv
-                processed_EDA.png  comparison_all_signals.png
-                cleaning_report.csv  preprocessing_metadata.json
-            module_4_analysis/user_001/
+            module_3_splitting/             (M3 split output)
+                train/user_001/EDA.csv ...
+                val/user_005/EDA.csv ...
+                test/user_002/EDA.csv ...
+                split_metadata.json  user_assignments.csv
+            module_4_eda/user_001/          (IBM EDA, train only)
                 analysis_report.html  3d_signals.html
                 summary_tables/
+                    data_understanding.csv
+                    data_quality_report.csv
+                    distribution_analysis.csv
+                    outlier_detection.csv
                     descriptive_statistics.csv
-                    kruskal_wallis_results.csv
-                    pairwise_mannwhitney.csv
-                    correlation_feature_target.csv
-                    correlation_matrix.csv
-                    temporal_dynamics.csv
-                    return_to_median_summary.csv
-                    pct_change_summary.csv
-                    threshold_events.csv
-                pct_change_from_baseline.png  temporal_dynamics.png
-                significant_features_kruskal.png  ...  (17 PNGs)
+                    inter_signal_correlation.csv
+                    kruskal_wallis_results.csv  ...
+                eda_metadata.json
+            module_5_preprocessing/user_001/
+                cleaned_signals/
+                    EDA.csv  BVP.csv  ...
+                processed_EDA.png  comparison_all_signals.png
+                cleaning_report.csv  preprocessing_metadata.json
+            module_6_feature_engineering/user_001/
+                features_raw/
+                    EDA_features.csv ... combined_features.csv
+                features_selected/
+                    feature_importance.csv
+                feature_engineering_metadata.json
 
 Standalone runs use timestamped folders:
-    outputs/standalone_M3_20250608_143022/
+    outputs/standalone_M5_20250608_143022/
 =============================================================================
 """
 from __future__ import annotations

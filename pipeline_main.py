@@ -50,8 +50,10 @@ REPO_ROOT = Path(__file__).resolve().parent
 # Module root directories
 M2A_DIR = REPO_ROOT / "module_2a_data_simulation"
 M1_DIR = REPO_ROOT / "module_1_data_acquisition"
-M3_DIR = REPO_ROOT / "module_3_preprocessing"
-M4_DIR = REPO_ROOT / "module_4_data_analyser"
+M3_DIR = REPO_ROOT / "module_3_data_splitting"
+M4_DIR = REPO_ROOT / "module_4_eda"
+M5_DIR = REPO_ROOT / "module_5_preprocessing"
+M6_DIR = REPO_ROOT / "module_6_feature_engineering"
 
 PIPELINE_VERSION = "1.0.0"
 
