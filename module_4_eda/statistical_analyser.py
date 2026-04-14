@@ -1,276 +1,35 @@
 """
 =============================================================================
-MODULE 4 – EXPLORATORY DATA ANALYSIS  |  statistical_analyser.py
+MODULE 4 - EXPLORATORY DATA ANALYSIS  |  statistical_analyser.py
 =============================================================================
-All statistical analyses on the extracted feature DataFrames:
+Descriptive and inferential statistics on combined multi-user raw signals.
 
-  1. Descriptive  — mean, std, median, IQR, min, max per target per feature
-  2. Statistical  — Kruskal-Wallis H + pairwise Mann-Whitney U + effect sizes
-  3. Correlation  — Spearman feature×target + feature×feature heatmap
-  4. ANOVA        — one-way ANOVA where normality holds (Shapiro-Wilk pre-check)
+Sections 5-6 of the EDA report:
+  Section 5 — Univariate (descriptive by target, category, demographic)
+  Section 6 — Bivariate (Kruskal-Wallis, Mann-Whitney U, demographic KW)
 =============================================================================
 """
 from __future__ import annotations
-from config import (
-    ALPHA, MIN_SAMPLES_PER_GROUP, EFFECT_SIZE_THRESHOLDS, META_COLS,
-)
 
 import warnings
+import logging
 import numpy as np
 import pandas as pd
 from scipy import stats
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
+from itertools import combinations
+
+from config import (
+    VALUE_COLS, ALL_VALUE_COLS, META_COLS, ALPHA, MIN_SAMPLES_PER_GROUP,
+    EFFECT_SIZE_THRESHOLDS, LABEL_TO_CATEGORY, DEMOGRAPHIC_FIELDS,
+)
 
 warnings.filterwarnings("ignore")
+log = logging.getLogger(__name__)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# DESCRIPTIVE ANALYSIS
-# ─────────────────────────────────────────────────────────────────────────────
-
-def descriptive_analysis(df: pd.DataFrame, label_col="target_label") -> pd.DataFrame:
-    """
-    Per-target descriptive statistics for all numeric features.
-
-    Returns a long-form DataFrame:
-      columns: target_label, feature, mean, std, median, iqr, min, max,
-               q25, q75, n, cv (coefficient of variation)
-    """
-    feat_cols = [c for c in df.columns if c not in META_COLS
-                 and pd.api.types.is_numeric_dtype(df[c])]
-    if not feat_cols or label_col not in df.columns:
-        return pd.DataFrame()
-
-    rows = []
-    for label, grp in df.groupby(label_col):
-        for col in feat_cols:
-            vals = grp[col].dropna().values.astype(float)
-            if len(vals) < 2:
-                continue
-            q25, q75 = np.percentile(vals, [25, 75])
-            mean_v = float(np.mean(vals))
-            std_v = float(np.std(vals, ddof=1))
-            rows.append({
-                "target_label": label,
-                "feature": col,
-                "n": len(vals),
-                "mean": round(mean_v, 4),
-                "std": round(std_v, 4),
-                "median": round(float(np.median(vals)), 4),
-                "iqr": round(float(q75 - q25), 4),
-                "q25": round(float(q25), 4),
-                "q75": round(float(q75), 4),
-                "min": round(float(np.min(vals)), 4),
-                "max": round(float(np.max(vals)), 4),
-                "cv": round(abs(std_v / (mean_v + 1e-9)), 4),
-            })
-    return pd.DataFrame(rows)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# KRUSKAL-WALLIS + PAIRWISE MANN-WHITNEY
-# ─────────────────────────────────────────────────────────────────────────────
-
-def kruskal_wallis_analysis(
-    df: pd.DataFrame, label_col="target_label"
-) -> pd.DataFrame:
-    """
-    Kruskal-Wallis H-test for each feature across all target groups.
-
-    Returns one row per feature:
-      feature, H_stat, p_value, significant, eta_squared (effect size),
-      effect_size_label
-    """
-    feat_cols = [c for c in df.columns if c not in META_COLS
-                 and pd.api.types.is_numeric_dtype(df[c])]
-    if not feat_cols or label_col not in df.columns:
-        return pd.DataFrame()
-
-    rows = []
-    for col in feat_cols:
-        groups = [
-            grp[col].dropna().values.astype(float)
-            for _, grp in df.groupby(label_col)
-            if len(grp[col].dropna()) >= MIN_SAMPLES_PER_GROUP
-        ]
-        if len(groups) < 2:
-            continue
-        try:
-            H, p = stats.kruskal(*groups)
-        except Exception:
-            continue
-
-        # Eta-squared effect size: η² = (H - k + 1) / (N - k)
-        N = sum(len(g) for g in groups)
-        k = len(groups)
-        eta2 = max(0, (H - k + 1) / (N - k + 1e-9))
-        es_label = _effect_label(eta2)
-
-        rows.append({
-            "feature": col,
-            "H_stat": round(H, 4),
-            "p_value": round(p, 6),
-            "significant": p < ALPHA,
-            "eta_squared": round(eta2, 4),
-            "effect_size": es_label,
-        })
-
-    result = pd.DataFrame(rows)
-    if not result.empty:
-        result = result.sort_values("p_value").reset_index(drop=True)
-    return result
-
-
-def pairwise_mannwhitney(
-    df: pd.DataFrame, label_col="target_label",
-    top_features: Optional[List[str]] = None,
-) -> pd.DataFrame:
-    """
-    Pairwise Mann-Whitney U test for top features across label pairs.
-    Applies Bonferroni correction.
-
-    Parameters
-    ----------
-    top_features : list of feature names to test (if None, uses top 20 by KW)
-    """
-    feat_cols = (top_features
-                 or [c for c in df.columns if c not in META_COLS and
-                     pd.api.types.is_numeric_dtype(df[c])][:20])
-    labels = sorted(df[label_col].unique())
-    rows = []
-    n_tests = len(feat_cols) * (len(labels) * (len(labels) - 1) // 2)
-    bonf = ALPHA / max(n_tests, 1)
-
-    for col in feat_cols:
-        for i, la in enumerate(labels):
-            for lb in labels[i + 1:]:
-                va = df.loc[df[label_col] == la, col].dropna().values.astype(float)
-                vb = df.loc[df[label_col] == lb, col].dropna().values.astype(float)
-                if len(va) < 2 or len(vb) < 2:
-                    continue
-                try:
-                    U, p = stats.mannwhitneyu(va, vb, alternative="two-sided")
-                except Exception:
-                    continue
-                # Rank-biserial correlation as effect size
-                r = 1 - (2 * U) / (len(va) * len(vb) + 1e-9)
-                rows.append({
-                    "feature": col,
-                    "group_a": la, "group_b": lb,
-                    "U_stat": round(U, 2),
-                    "p_value": round(p, 6),
-                    "p_bonf": round(p * n_tests, 6),
-                    "significant": p < bonf,
-                    "effect_r": round(abs(r), 4),
-                    "effect_size": _effect_label(abs(r)),
-                    "n_a": len(va), "n_b": len(vb),
-                })
-
-    result = pd.DataFrame(rows)
-    if not result.empty:
-        result = result.sort_values("p_bonf").reset_index(drop=True)
-    return result
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# CORRELATION ANALYSIS
-# ─────────────────────────────────────────────────────────────────────────────
-
-def correlation_feature_target(
-    df: pd.DataFrame, label_col="target_label"
-) -> pd.DataFrame:
-    """
-    Spearman correlation between each feature and the (encoded) target label.
-
-    Returns: feature, spearman_r, p_value, abs_r, effect_size
-    """
-    feat_cols = [c for c in df.columns if c not in META_COLS
-                 and pd.api.types.is_numeric_dtype(df[c])]
-    if not feat_cols or label_col not in df.columns:
-        return pd.DataFrame()
-
-    # Ordinal encode the target label
-    label_cats = pd.Categorical(df[label_col]).codes
-
-    rows = []
-    for col in feat_cols:
-        vals = df[col].values.astype(float)
-        mask = ~np.isnan(vals)
-        if mask.sum() < 5:
-            continue
-        try:
-            r, p = stats.spearmanr(vals[mask], label_cats[mask])
-        except Exception:
-            continue
-        rows.append({
-            "feature": col,
-            "spearman_r": round(float(r), 4),
-            "p_value": round(float(p), 6),
-            "abs_r": round(abs(float(r)), 4),
-            "effect_size": _effect_label(abs(float(r))),
-            "significant": float(p) < ALPHA,
-        })
-
-    result = pd.DataFrame(rows)
-    if not result.empty:
-        result = result.sort_values("abs_r", ascending=False).reset_index(drop=True)
-    return result
-
-
-def correlation_feature_matrix(
-    df: pd.DataFrame, max_features: int = 30
-) -> Tuple[pd.DataFrame, List[str]]:
-    """
-    Spearman correlation matrix among the top N most variable features.
-
-    Returns (corr_matrix, feature_names).
-    """
-    feat_cols = [c for c in df.columns if c not in META_COLS
-                 and pd.api.types.is_numeric_dtype(df[c])]
-    if not feat_cols:
-        return pd.DataFrame(), []
-
-    # Select top N by variance
-    variances = df[feat_cols].var().sort_values(ascending=False)
-    top_feats = variances.index[:max_features].tolist()
-    sub = df[top_feats].dropna()
-    if len(sub) < 3:
-        return pd.DataFrame(), top_feats
-
-    corr_mat, _ = stats.spearmanr(sub.values)
-    if corr_mat.ndim == 0:
-        return pd.DataFrame(), top_feats
-    corr_df = pd.DataFrame(
-        corr_mat if corr_mat.ndim == 2 else [[corr_mat]],
-        index=top_feats[:len(sub.columns)],
-        columns=top_feats[:len(sub.columns)],
-    )
-    return corr_df, top_feats
-
-
-def signal_pct_change_summary(dynamics_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Summarise % change from baseline per signal × target label.
-    Shows mean, std, median, and range of change_pct.
-    """
-    if dynamics_df.empty or "change_pct" not in dynamics_df.columns:
-        return pd.DataFrame()
-    grp = dynamics_df.groupby(["signal", "target_label"])["change_pct"]
-    return grp.agg(
-        mean_change_pct="mean",
-        std_change_pct="std",
-        median_change_pct="median",
-        min_change_pct="min",
-        max_change_pct="max",
-        n_events="count",
-    ).round(2).reset_index()
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# HELPERS
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _effect_label(magnitude: float) -> str:
+    """Classify effect size as negligible/small/medium/large."""
     t = EFFECT_SIZE_THRESHOLDS
     if magnitude >= t["large"]:
         return "large"
@@ -279,3 +38,361 @@ def _effect_label(magnitude: float) -> str:
     elif magnitude >= t["small"]:
         return "small"
     return "negligible"
+
+
+def _get_value_series(df: pd.DataFrame, sig_name: str) -> List[Tuple[str, pd.Series]]:
+    """Get all value column series from a signal DataFrame."""
+    val_cols = VALUE_COLS.get(sig_name, [])
+    result = []
+    for vc in val_cols:
+        if vc in df.columns:
+            result.append((vc, df[vc]))
+    return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION 5: UNIVARIATE ANALYSIS (Descriptive Statistics)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def descriptive_by_target(
+    signals: Dict[str, pd.DataFrame],
+) -> pd.DataFrame:
+    """
+    Section 5.1 — Per-target descriptive stats for each signal value column.
+
+    Returns long-form: signal, value_col, target_label, n, mean, std, median,
+                       iqr, q25, q75, min, max, cv.
+    """
+    rows = []
+    for sig_name, df in sorted(signals.items()):
+        if df is None or "target_label" not in df.columns:
+            continue
+        for vc, series in _get_value_series(df, sig_name):
+            for label, grp in df.groupby("target_label"):
+                vals = grp[vc].dropna().astype(float).values
+                if len(vals) < 2:
+                    continue
+                q25, q75 = float(np.percentile(vals, 25)), float(np.percentile(vals, 75))
+                mean_v = float(np.mean(vals))
+                std_v = float(np.std(vals, ddof=1))
+                rows.append({
+                    "signal": sig_name,
+                    "value_col": vc,
+                    "target_label": str(label),
+                    "n": len(vals),
+                    "mean": round(mean_v, 4),
+                    "std": round(std_v, 4),
+                    "median": round(float(np.median(vals)), 4),
+                    "iqr": round(q75 - q25, 4),
+                    "q25": round(q25, 4),
+                    "q75": round(q75, 4),
+                    "min": round(float(np.min(vals)), 4),
+                    "max": round(float(np.max(vals)), 4),
+                    "cv": round(abs(std_v / (mean_v + 1e-9)), 4),
+                })
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
+
+
+def descriptive_by_category(
+    signals: Dict[str, pd.DataFrame],
+) -> pd.DataFrame:
+    """
+    Section 5.2 — Per-category (affective/physiological_need/behavioural/baseline)
+    descriptive stats.
+    """
+    rows = []
+    for sig_name, df in sorted(signals.items()):
+        if df is None or "target_label" not in df.columns:
+            continue
+        df_cat = df.copy()
+        df_cat["category"] = df_cat["target_label"].map(LABEL_TO_CATEGORY)
+        for vc, _ in _get_value_series(df, sig_name):
+            for cat, grp in df_cat.groupby("category"):
+                vals = grp[vc].dropna().astype(float).values
+                if len(vals) < 2:
+                    continue
+                q25, q75 = float(np.percentile(vals, 25)), float(np.percentile(vals, 75))
+                mean_v = float(np.mean(vals))
+                std_v = float(np.std(vals, ddof=1))
+                rows.append({
+                    "signal": sig_name,
+                    "value_col": vc,
+                    "category": str(cat),
+                    "n": len(vals),
+                    "mean": round(mean_v, 4),
+                    "std": round(std_v, 4),
+                    "median": round(float(np.median(vals)), 4),
+                    "iqr": round(q75 - q25, 4),
+                    "q25": round(q25, 4),
+                    "q75": round(q75, 4),
+                    "min": round(float(np.min(vals)), 4),
+                    "max": round(float(np.max(vals)), 4),
+                    "cv": round(abs(std_v / (mean_v + 1e-9)), 4),
+                })
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
+
+
+def descriptive_by_demographic(
+    signals: Dict[str, pd.DataFrame],
+    demographics: pd.DataFrame,
+    demo_field: str = "autism_severity",
+) -> pd.DataFrame:
+    """
+    Section 5.3 — Descriptive stats grouped by demographic field.
+
+    Joins signals with demographics on user_id, then groups by demo_field.
+    """
+    if demographics is None or demographics.empty or demo_field not in demographics.columns:
+        return pd.DataFrame()
+
+    rows = []
+    demo_sub = demographics[["user_id", demo_field]].drop_duplicates()
+
+    for sig_name, df in sorted(signals.items()):
+        if df is None or "user_id" not in df.columns:
+            continue
+        merged = df.merge(demo_sub, on="user_id", how="left")
+        for vc, _ in _get_value_series(df, sig_name):
+            if vc not in merged.columns:
+                continue
+            for grp_val, grp in merged.groupby(demo_field):
+                vals = grp[vc].dropna().astype(float).values
+                if len(vals) < 2:
+                    continue
+                q25, q75 = float(np.percentile(vals, 25)), float(np.percentile(vals, 75))
+                mean_v = float(np.mean(vals))
+                std_v = float(np.std(vals, ddof=1))
+                rows.append({
+                    "signal": sig_name,
+                    "value_col": vc,
+                    "demographic_field": demo_field,
+                    "demographic_value": str(grp_val),
+                    "n": len(vals),
+                    "mean": round(mean_v, 4),
+                    "std": round(std_v, 4),
+                    "median": round(float(np.median(vals)), 4),
+                    "iqr": round(q75 - q25, 4),
+                    "cv": round(abs(std_v / (mean_v + 1e-9)), 4),
+                })
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION 6: BIVARIATE ANALYSIS (Group Comparisons)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def kruskal_wallis(
+    signals: Dict[str, pd.DataFrame],
+) -> pd.DataFrame:
+    """
+    Section 6.2 — Kruskal-Wallis H-test per signal value column across targets.
+
+    Returns: signal, value_col, H_stat, p_value, n_groups, N_total,
+             eta_squared, effect_size, significant.
+    """
+    rows = []
+    for sig_name, df in sorted(signals.items()):
+        if df is None or "target_label" not in df.columns:
+            continue
+        for vc, _ in _get_value_series(df, sig_name):
+            groups = []
+            group_labels = []
+            for label, grp in df.groupby("target_label"):
+                vals = grp[vc].dropna().astype(float).values
+                if len(vals) >= MIN_SAMPLES_PER_GROUP:
+                    groups.append(vals)
+                    group_labels.append(label)
+            if len(groups) < 2:
+                continue
+            try:
+                H, p = stats.kruskal(*groups)
+            except Exception:
+                continue
+
+            N = sum(len(g) for g in groups)
+            k = len(groups)
+            eta2 = max(0.0, (H - k + 1) / (N - k + 1e-9))
+
+            rows.append({
+                "signal": sig_name,
+                "value_col": vc,
+                "H_stat": round(float(H), 4),
+                "p_value": float(p),
+                "n_groups": k,
+                "N_total": N,
+                "eta_squared": round(eta2, 4),
+                "effect_size": _effect_label(eta2),
+                "significant": bool(p < ALPHA),
+            })
+
+    result = pd.DataFrame(rows)
+    if not result.empty:
+        result = result.sort_values("p_value").reset_index(drop=True)
+    return result
+
+
+def pairwise_mann_whitney(
+    signals: Dict[str, pd.DataFrame],
+    significant_only: bool = True,
+    kw_results: Optional[pd.DataFrame] = None,
+) -> pd.DataFrame:
+    """
+    Section 6.3 — Pairwise Mann-Whitney U with Bonferroni correction.
+
+    Only tests signal/column pairs that were significant in KW (if provided).
+    Returns: signal, value_col, group_a, group_b, U_stat, p_value,
+             p_bonferroni, significant, rank_biserial_r, effect_size, n_a, n_b.
+    """
+    # Determine which signal+col combos to test
+    if kw_results is not None and not kw_results.empty and significant_only:
+        sig_kw = kw_results[kw_results["significant"]]
+        test_pairs = set(zip(sig_kw["signal"], sig_kw["value_col"]))
+    else:
+        test_pairs = None  # test all
+
+    rows = []
+    for sig_name, df in sorted(signals.items()):
+        if df is None or "target_label" not in df.columns:
+            continue
+        labels = sorted(df["target_label"].unique())
+        for vc, _ in _get_value_series(df, sig_name):
+            if test_pairs is not None and (sig_name, vc) not in test_pairs:
+                continue
+
+            # Count total pairwise tests for Bonferroni
+            valid_labels = [
+                l for l in labels
+                if len(df.loc[df["target_label"] == l, vc].dropna()) >= MIN_SAMPLES_PER_GROUP
+            ]
+            n_comparisons = len(valid_labels) * (len(valid_labels) - 1) // 2
+            if n_comparisons < 1:
+                continue
+
+            for la, lb in combinations(valid_labels, 2):
+                va = df.loc[df["target_label"] == la, vc].dropna().astype(float).values
+                vb = df.loc[df["target_label"] == lb, vc].dropna().astype(float).values
+                if len(va) < MIN_SAMPLES_PER_GROUP or len(vb) < MIN_SAMPLES_PER_GROUP:
+                    continue
+                try:
+                    U, p = stats.mannwhitneyu(va, vb, alternative="two-sided")
+                except Exception:
+                    continue
+
+                # Rank-biserial correlation
+                r = 1 - (2 * U) / (len(va) * len(vb) + 1e-9)
+                p_bonf = min(p * n_comparisons, 1.0)
+
+                rows.append({
+                    "signal": sig_name,
+                    "value_col": vc,
+                    "group_a": la,
+                    "group_b": lb,
+                    "U_stat": round(float(U), 2),
+                    "p_value": float(p),
+                    "p_bonferroni": round(p_bonf, 6),
+                    "significant": bool(p_bonf < ALPHA),
+                    "rank_biserial_r": round(abs(float(r)), 4),
+                    "effect_size": _effect_label(abs(float(r))),
+                    "n_a": len(va),
+                    "n_b": len(vb),
+                })
+
+    result = pd.DataFrame(rows)
+    if not result.empty:
+        result = result.sort_values("p_bonferroni").reset_index(drop=True)
+    return result
+
+
+def kruskal_wallis_demographic(
+    signals: Dict[str, pd.DataFrame],
+    demographics: pd.DataFrame,
+    demo_fields: Optional[List[str]] = None,
+) -> pd.DataFrame:
+    """
+    Section 6.4 — Kruskal-Wallis H-test for demographic group differences.
+
+    Tests whether signal distributions differ across severity, verbal_status, etc.
+    """
+    if demographics is None or demographics.empty:
+        return pd.DataFrame()
+    if demo_fields is None:
+        demo_fields = [f for f in ["autism_severity", "verbal_status"]
+                       if f in demographics.columns]
+
+    demo_sub = demographics[["user_id"] + [f for f in demo_fields
+                                            if f in demographics.columns]].drop_duplicates()
+    rows = []
+    for sig_name, df in sorted(signals.items()):
+        if df is None or "user_id" not in df.columns:
+            continue
+        merged = df.merge(demo_sub, on="user_id", how="left")
+        for vc, _ in _get_value_series(df, sig_name):
+            if vc not in merged.columns:
+                continue
+            for field in demo_fields:
+                if field not in merged.columns:
+                    continue
+                groups = []
+                group_labels = []
+                for val, grp in merged.groupby(field):
+                    v = grp[vc].dropna().astype(float).values
+                    if len(v) >= MIN_SAMPLES_PER_GROUP:
+                        groups.append(v)
+                        group_labels.append(val)
+                if len(groups) < 2:
+                    continue
+                try:
+                    H, p = stats.kruskal(*groups)
+                except Exception:
+                    continue
+                N = sum(len(g) for g in groups)
+                k = len(groups)
+                eta2 = max(0.0, (H - k + 1) / (N - k + 1e-9))
+                rows.append({
+                    "signal": sig_name,
+                    "value_col": vc,
+                    "demographic_field": field,
+                    "groups": str(group_labels),
+                    "H_stat": round(float(H), 4),
+                    "p_value": float(p),
+                    "eta_squared": round(eta2, 4),
+                    "effect_size": _effect_label(eta2),
+                    "significant": bool(p < ALPHA),
+                })
+
+    result = pd.DataFrame(rows)
+    if not result.empty:
+        result = result.sort_values("p_value").reset_index(drop=True)
+    return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CONVENIENCE: RUN ALL STATISTICAL ANALYSES
+# ─────────────────────────────────────────────────────────────────────────────
+
+def run_all_statistics(
+    signals: Dict[str, pd.DataFrame],
+    demographics: Optional[pd.DataFrame] = None,
+) -> Dict[str, pd.DataFrame]:
+    """Run all descriptive and inferential statistical analyses."""
+    kw = kruskal_wallis(signals)
+
+    results = {
+        "descriptive_by_target": descriptive_by_target(signals),
+        "descriptive_by_category": descriptive_by_category(signals),
+        "kruskal_wallis": kw,
+        "pairwise_mann_whitney": pairwise_mann_whitney(signals, kw_results=kw),
+    }
+
+    if demographics is not None and not demographics.empty:
+        results["descriptive_by_severity"] = descriptive_by_demographic(
+            signals, demographics, "autism_severity"
+        )
+        results["descriptive_by_verbal"] = descriptive_by_demographic(
+            signals, demographics, "verbal_status"
+        )
+        results["kw_demographic"] = kruskal_wallis_demographic(
+            signals, demographics
+        )
+
+    return results

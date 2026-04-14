@@ -1,290 +1,408 @@
 """
 =============================================================================
-MODULE 4 – EXPLORATORY DATA ANALYSIS  |  data_quality.py
+MODULE 4 - EXPLORATORY DATA ANALYSIS  |  data_quality.py
 =============================================================================
-IBM EDA Best Practices — Data Understanding & Quality Assessment.
+Combined multi-user data understanding, quality assessment, distribution
+analysis, and outlier detection.
 
-Implements IBM's recommended EDA methodology phases:
-  Phase 1: Data Understanding — shape, types, summary statistics
-  Phase 2: Data Quality — missing values, outliers, duplicates, consistency
-  Phase 3: Distribution Analysis — skewness, kurtosis, normality tests
-
-These assessments inform downstream preprocessing (M5) and feature
-engineering (M6) decisions.
+Sections 2-4 of the EDA report:
+  Section 2 — Data Understanding (signal overview, target distribution)
+  Section 3 — Data Quality (missing, outliers, range, sampling rate)
+  Section 4 — Distribution Analysis (normality, skewness, kurtosis)
 =============================================================================
 """
 from __future__ import annotations
 
 import warnings
+import logging
 import numpy as np
 import pandas as pd
 from scipy import stats
 from typing import Dict, List, Optional, Tuple
 
-from config import VALUE_COLS, SIGNAL_UNITS
+from config import (
+    VALUE_COLS, ALL_VALUE_COLS, SIGNAL_UNITS, SIGNAL_SAMPLING_RATES,
+    SIGNAL_RANGES, META_COLS, LABEL_TO_CATEGORY, ALPHA,
+)
 
 warnings.filterwarnings("ignore")
+log = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PHASE 1: DATA UNDERSTANDING
+# SECTION 2: DATA UNDERSTANDING
 # ─────────────────────────────────────────────────────────────────────────────
 
-def data_understanding(
-    signals: Dict[str, pd.DataFrame],
-) -> pd.DataFrame:
+def signal_overview(signals: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     """
-    IBM EDA Phase 1 — Understand the data.
+    Section 2.1 — Signal overview across all training users.
 
-    For each signal, reports:
-      - Number of rows (samples) and columns
-      - Sampling rate (inferred from timestamps)
-      - Duration in seconds
-      - Data types
-      - Basic summary statistics
-
-    Returns
-    -------
-    DataFrame with one row per signal, columns:
-      signal, n_rows, n_cols, duration_s, sampling_rate_hz,
-      value_col, mean, std, min, q25, median, q75, max
+    Returns one row per signal with: total samples, n_users, duration,
+    inferred sampling rate, value columns, and basic summary stats.
     """
     rows = []
-    for sig_name, df in signals.items():
+    for sig_name, df in sorted(signals.items()):
         if df is None or len(df) == 0:
             continue
 
+        n_users = df["user_id"].nunique() if "user_id" in df.columns else 1
         row = {
             "signal": sig_name,
-            "n_rows": len(df),
-            "n_cols": df.shape[1],
             "unit": SIGNAL_UNITS.get(sig_name, "unknown"),
+            "expected_fs_hz": SIGNAL_SAMPLING_RATES.get(sig_name),
+            "n_rows": len(df),
+            "n_users": n_users,
         }
 
-        # Infer duration and sampling rate from timestamp_s
+        # Duration and inferred sampling rate
         if "timestamp_s" in df.columns:
             ts = df["timestamp_s"].values
             row["duration_s"] = round(float(ts[-1] - ts[0]), 2)
             if len(ts) > 1:
                 dt = np.median(np.diff(ts))
-                row["sampling_rate_hz"] = round(1.0 / dt, 1) if dt > 0 else 0
+                row["inferred_fs_hz"] = round(1.0 / dt, 1) if dt > 0 else 0
             else:
-                row["sampling_rate_hz"] = 0
+                row["inferred_fs_hz"] = 0
         else:
             row["duration_s"] = 0
-            row["sampling_rate_hz"] = 0
+            row["inferred_fs_hz"] = 0
 
-        # Summary statistics on the primary value column
+        # Summary stats on each value column
         val_cols = VALUE_COLS.get(sig_name, [])
-        if not val_cols:
-            # ACC has multiple columns; find any numeric column
-            val_cols = [c for c in df.columns
-                        if c not in ("timestamp_s", "target_label", "event_id",
-                                     "category")
-                        and pd.api.types.is_numeric_dtype(df[c])]
-        val_col = val_cols[0] if val_cols else None
-        row["value_col"] = val_col
-
-        if val_col and val_col in df.columns:
-            vals = df[val_col].dropna().astype(float)
-            row["mean"] = round(float(vals.mean()), 4)
-            row["std"] = round(float(vals.std()), 4)
-            row["min"] = round(float(vals.min()), 4)
-            row["q25"] = round(float(np.percentile(vals, 25)), 4)
-            row["median"] = round(float(np.median(vals)), 4)
-            row["q75"] = round(float(np.percentile(vals, 75)), 4)
-            row["max"] = round(float(vals.max()), 4)
+        for vc in val_cols:
+            if vc not in df.columns:
+                continue
+            vals = df[vc].dropna().astype(float)
+            row[f"{vc}_mean"] = round(float(vals.mean()), 4)
+            row[f"{vc}_std"] = round(float(vals.std()), 4)
+            row[f"{vc}_min"] = round(float(vals.min()), 4)
+            row[f"{vc}_max"] = round(float(vals.max()), 4)
 
         rows.append(row)
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
 
+
+def target_distribution(signals: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """
+    Section 2.2 — Target label distribution across combined data.
+
+    Uses the first signal with target_label to count per-label occurrences.
+    Returns: target_label, category, n_samples, pct, n_users.
+    """
+    # Pick the signal with target_label column
+    ref_df = None
+    for df in signals.values():
+        if df is not None and "target_label" in df.columns:
+            ref_df = df
+            break
+    if ref_df is None or len(ref_df) == 0:
+        return pd.DataFrame()
+
+    rows = []
+    total = len(ref_df)
+    for label, grp in ref_df.groupby("target_label"):
+        n = len(grp)
+        n_users = grp["user_id"].nunique() if "user_id" in grp.columns else 1
+        rows.append({
+            "target_label": label,
+            "category": LABEL_TO_CATEGORY.get(label, "unknown"),
+            "n_samples": n,
+            "pct": round(100.0 * n / total, 2),
+            "n_users": n_users,
+        })
+    result = pd.DataFrame(rows).sort_values("n_samples", ascending=False)
+    return result.reset_index(drop=True)
+
+
+def user_label_matrix(signals: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """
+    Section 2.2 — User × label presence heatmap data.
+
+    Returns a pivot table: rows=user_id, columns=target_label, values=n_samples.
+    """
+    ref_df = None
+    for df in signals.values():
+        if df is not None and "target_label" in df.columns and "user_id" in df.columns:
+            ref_df = df
+            break
+    if ref_df is None:
+        return pd.DataFrame()
+
+    pivot = ref_df.groupby(["user_id", "target_label"]).size().unstack(fill_value=0)
+    return pivot
+
+
+def per_user_summary(signals: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """
+    Section 2.3 — Per-user data summary (rows per signal per user).
+    """
+    rows = []
+    for sig_name, df in sorted(signals.items()):
+        if df is None or "user_id" not in df.columns:
+            continue
+        for uid, udf in df.groupby("user_id"):
+            row = {"user_id": uid, "signal": sig_name, "n_rows": len(udf)}
+            if "timestamp_s" in udf.columns and len(udf) > 1:
+                row["duration_s"] = round(
+                    float(udf["timestamp_s"].max() - udf["timestamp_s"].min()), 1
+                )
+            rows.append(row)
     return pd.DataFrame(rows) if rows else pd.DataFrame()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PHASE 2: DATA QUALITY ASSESSMENT
+# SECTION 3: DATA QUALITY ASSESSMENT
 # ─────────────────────────────────────────────────────────────────────────────
 
-def data_quality_report(
-    signals: Dict[str, pd.DataFrame],
-) -> pd.DataFrame:
+def missing_values_report(signals: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     """
-    IBM EDA Phase 2 — Assess data quality.
+    Section 3.1 — Missing value analysis per signal × value column.
 
-    For each signal, reports:
-      - Missing value count and percentage
-      - Duplicate row count and percentage
-      - Out-of-range value count (physiological bounds)
-      - Flatline segments (constant value runs)
-      - Completeness score (0-1)
-
-    Returns
-    -------
-    DataFrame with one row per signal, columns:
-      signal, value_col, n_total, n_missing, pct_missing,
-      n_duplicates, pct_duplicates, n_out_of_range, pct_out_of_range,
-      n_flatline_segments, max_flatline_length, completeness_score,
-      quality_grade
+    Returns: signal, value_col, n_total, n_missing, pct_missing,
+             n_users_affected, completeness_score.
     """
-    # Physiological bounds for out-of-range detection
-    BOUNDS = {
-        "EDA_uS": (0.01, 30.0),
-        "BVP_nT": (-300.0, 300.0),
-        "IBI_ms": (300.0, 1500.0),
-        "ST_degC": (25.0, 40.0),
-        "ACC_X_g": (-4.0, 4.0),
-        "ACC_Y_g": (-4.0, 4.0),
-        "ACC_Z_g": (-4.0, 4.0),
-    }
-
     rows = []
-    for sig_name, df in signals.items():
+    for sig_name, df in sorted(signals.items()):
         if df is None or len(df) == 0:
             continue
-
         val_cols = VALUE_COLS.get(sig_name, [])
-        if not val_cols:
-            val_cols = [c for c in df.columns
-                        if c not in ("timestamp_s", "target_label", "event_id",
-                                     "category")
-                        and pd.api.types.is_numeric_dtype(df[c])]
-
-        for val_col in val_cols:
-            if val_col not in df.columns:
+        for vc in val_cols:
+            if vc not in df.columns:
                 continue
             n_total = len(df)
-            series = df[val_col]
-
-            # Missing values
-            n_missing = int(series.isna().sum())
-            pct_missing = round(100.0 * n_missing / max(n_total, 1), 2)
-
-            # Duplicates (consecutive identical values)
-            n_duplicates = int((series.diff() == 0).sum())
-            pct_duplicates = round(100.0 * n_duplicates / max(n_total, 1), 2)
-
-            # Out-of-range values
-            n_oor = 0
-            lo, hi = BOUNDS.get(val_col, (None, None))
-            if lo is not None and hi is not None:
-                valid = series.dropna()
-                n_oor = int(((valid < lo) | (valid > hi)).sum())
-            pct_oor = round(100.0 * n_oor / max(n_total, 1), 2)
-
-            # Flatline detection (runs of identical values)
-            vals = series.dropna().values
-            flatline_segs = 0
-            max_flat_len = 0
-            if len(vals) > 1:
-                diffs = np.diff(vals)
-                is_flat = np.abs(diffs) < 1e-8
-                # Count transitions from non-flat to flat
-                transitions = np.diff(is_flat.astype(int))
-                flatline_segs = int((transitions == 1).sum())
-                if is_flat[0]:
-                    flatline_segs += 1
-                # Longest flatline run
-                if flatline_segs > 0:
-                    runs = []
-                    run_len = 1 if is_flat[0] else 0
-                    for f in is_flat[1:]:
-                        if f:
-                            run_len += 1
-                        else:
-                            if run_len > 0:
-                                runs.append(run_len)
-                            run_len = 0
-                    if run_len > 0:
-                        runs.append(run_len)
-                    max_flat_len = max(runs) if runs else 0
-
-            # Completeness score (1.0 = perfect)
-            completeness = round(1.0 - (n_missing / max(n_total, 1)), 4)
-
-            # Quality grade
-            if pct_missing > 30 or pct_oor > 10:
-                grade = "POOR"
-            elif pct_missing > 10 or pct_oor > 5:
-                grade = "FAIR"
-            elif pct_missing > 2 or pct_oor > 1:
-                grade = "GOOD"
-            else:
-                grade = "EXCELLENT"
-
+            n_missing = int(df[vc].isna().sum())
+            pct_missing = round(100.0 * n_missing / max(n_total, 1), 4)
+            n_users_affected = 0
+            if "user_id" in df.columns and n_missing > 0:
+                n_users_affected = int(
+                    df[df[vc].isna()]["user_id"].nunique()
+                )
             rows.append({
                 "signal": sig_name,
-                "value_col": val_col,
+                "value_col": vc,
                 "n_total": n_total,
                 "n_missing": n_missing,
                 "pct_missing": pct_missing,
-                "n_duplicates": n_duplicates,
-                "pct_duplicates": pct_duplicates,
-                "n_out_of_range": n_oor,
-                "pct_out_of_range": pct_oor,
-                "n_flatline_segments": flatline_segs,
-                "max_flatline_length": max_flat_len,
-                "completeness_score": completeness,
-                "quality_grade": grade,
+                "n_users_affected": n_users_affected,
+                "completeness_score": round(1.0 - pct_missing / 100, 4),
             })
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
 
+
+def outlier_detection_iqr(
+    signals: Dict[str, pd.DataFrame],
+    iqr_factor: float = 1.5,
+) -> pd.DataFrame:
+    """
+    Section 3.2 — IQR-based outlier detection per signal × value column.
+
+    Returns: signal, value_col, n_total, q1, q3, iqr, lower_fence,
+             upper_fence, n_outliers, pct_outliers, outlier_min, outlier_max.
+    """
+    rows = []
+    for sig_name, df in sorted(signals.items()):
+        if df is None or len(df) == 0:
+            continue
+        val_cols = VALUE_COLS.get(sig_name, [])
+        for vc in val_cols:
+            if vc not in df.columns:
+                continue
+            vals = df[vc].dropna().astype(float)
+            n = len(vals)
+            if n < 4:
+                continue
+            q1, q3 = float(np.percentile(vals, 25)), float(np.percentile(vals, 75))
+            iqr = q3 - q1
+            lower = q1 - iqr_factor * iqr
+            upper = q3 + iqr_factor * iqr
+            outlier_mask = (vals < lower) | (vals > upper)
+            n_out = int(outlier_mask.sum())
+            out_vals = vals[outlier_mask]
+            rows.append({
+                "signal": sig_name,
+                "value_col": vc,
+                "n_total": n,
+                "q1": round(q1, 4),
+                "q3": round(q3, 4),
+                "iqr": round(iqr, 4),
+                "lower_fence": round(lower, 4),
+                "upper_fence": round(upper, 4),
+                "n_outliers": n_out,
+                "pct_outliers": round(100.0 * n_out / n, 2),
+                "outlier_min": round(float(out_vals.min()), 4) if n_out > 0 else np.nan,
+                "outlier_max": round(float(out_vals.max()), 4) if n_out > 0 else np.nan,
+            })
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
+
+
+def signal_range_check(signals: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """
+    Section 3.3 — Signal range consistency (physiological plausibility).
+
+    Checks each value column against known physiological bounds from config.
+    Returns: signal, value_col, expected_min, expected_max, actual_min,
+             actual_max, n_below, n_above, pct_out_of_range, verdict.
+    """
+    rows = []
+    for sig_name, df in sorted(signals.items()):
+        if df is None or len(df) == 0:
+            continue
+        val_cols = VALUE_COLS.get(sig_name, [])
+        for vc in val_cols:
+            if vc not in df.columns or vc not in SIGNAL_RANGES:
+                continue
+            lo, hi = SIGNAL_RANGES[vc]
+            vals = df[vc].dropna().astype(float)
+            n = len(vals)
+            if n == 0:
+                continue
+            n_below = int((vals < lo).sum())
+            n_above = int((vals > hi).sum())
+            pct_oor = round(100.0 * (n_below + n_above) / n, 4)
+            verdict = "PASS" if pct_oor < 1.0 else ("WARNING" if pct_oor < 5.0 else "FAIL")
+            rows.append({
+                "signal": sig_name,
+                "value_col": vc,
+                "expected_min": lo,
+                "expected_max": hi,
+                "actual_min": round(float(vals.min()), 4),
+                "actual_max": round(float(vals.max()), 4),
+                "n_below": n_below,
+                "n_above": n_above,
+                "n_total": n,
+                "pct_out_of_range": pct_oor,
+                "verdict": verdict,
+            })
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
+
+
+def sampling_rate_check(signals: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """
+    Section 3.4 — Sampling rate verification per signal.
+
+    Compares inferred sampling rate against expected rates from config.
+    Returns: signal, expected_fs, inferred_fs, deviation_pct, verdict.
+    """
+    rows = []
+    for sig_name, df in sorted(signals.items()):
+        if df is None or len(df) < 2 or "timestamp_s" not in df.columns:
+            continue
+        expected_fs = SIGNAL_SAMPLING_RATES.get(sig_name)
+        if expected_fs is None:
+            continue  # event-based (IBI)
+        dt = np.median(np.diff(df["timestamp_s"].values))
+        inferred_fs = 1.0 / dt if dt > 0 else 0
+        deviation = abs(inferred_fs - expected_fs) / expected_fs * 100 if expected_fs > 0 else 0
+        verdict = "PASS" if deviation < 5 else ("WARNING" if deviation < 15 else "FAIL")
+        rows.append({
+            "signal": sig_name,
+            "expected_fs_hz": expected_fs,
+            "inferred_fs_hz": round(inferred_fs, 2),
+            "deviation_pct": round(deviation, 2),
+            "verdict": verdict,
+        })
     return pd.DataFrame(rows) if rows else pd.DataFrame()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PHASE 3: DISTRIBUTION ANALYSIS
+# SECTION 4: DISTRIBUTION ANALYSIS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def distribution_analysis(
-    signals: Dict[str, pd.DataFrame],
-) -> pd.DataFrame:
+def normality_tests(signals: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     """
-    IBM EDA Phase 3 — Analyse distributions.
+    Section 4.1 — Normality testing: Shapiro-Wilk + D'Agostino-Pearson.
 
-    For each signal's value column, reports:
-      - Skewness and kurtosis
-      - Shapiro-Wilk normality test (on a subsample if n > 5000)
-      - Distribution shape classification
-      - Recommended transformation (log, sqrt, none)
+    For each value column:
+      - Shapiro-Wilk on subsample (max 5000, required for scipy)
+      - D'Agostino-Pearson omnibus (more robust for N > 5000)
+      - Combined verdict
 
-    Returns
-    -------
-    DataFrame with columns:
-      signal, value_col, skewness, kurtosis, shapiro_W, shapiro_p,
-      is_normal, distribution_shape, recommended_transform
+    Returns: signal, value_col, n, shapiro_W, shapiro_p, dagostino_K2,
+             dagostino_p, is_normal_shapiro, is_normal_dagostino, verdict.
     """
     rows = []
-    for sig_name, df in signals.items():
+    for sig_name, df in sorted(signals.items()):
         if df is None or len(df) == 0:
             continue
-
         val_cols = VALUE_COLS.get(sig_name, [])
-        if not val_cols:
-            val_cols = [c for c in df.columns
-                        if c not in ("timestamp_s", "target_label", "event_id",
-                                     "category")
-                        and pd.api.types.is_numeric_dtype(df[c])]
-
-        for val_col in val_cols:
-            if val_col not in df.columns:
+        for vc in val_cols:
+            if vc not in df.columns:
                 continue
-            vals = df[val_col].dropna().astype(float).values
+            vals = df[vc].dropna().astype(float).values
+            n = len(vals)
+            if n < 8:
+                continue
+
+            row = {"signal": sig_name, "value_col": vc, "n": n}
+
+            # Shapiro-Wilk (subsample for large N)
+            sub = vals[:5000] if n > 5000 else vals
+            try:
+                w, p_sw = stats.shapiro(sub)
+                row["shapiro_W"] = round(float(w), 6)
+                row["shapiro_p"] = float(p_sw)
+                row["is_normal_shapiro"] = bool(p_sw > ALPHA)
+            except Exception:
+                row["shapiro_W"] = np.nan
+                row["shapiro_p"] = np.nan
+                row["is_normal_shapiro"] = False
+
+            # D'Agostino-Pearson (needs N >= 20)
+            if n >= 20:
+                try:
+                    k2, p_da = stats.normaltest(vals)
+                    row["dagostino_K2"] = round(float(k2), 4)
+                    row["dagostino_p"] = float(p_da)
+                    row["is_normal_dagostino"] = bool(p_da > ALPHA)
+                except Exception:
+                    row["dagostino_K2"] = np.nan
+                    row["dagostino_p"] = np.nan
+                    row["is_normal_dagostino"] = False
+            else:
+                row["dagostino_K2"] = np.nan
+                row["dagostino_p"] = np.nan
+                row["is_normal_dagostino"] = False
+
+            # Combined verdict
+            sw_normal = row.get("is_normal_shapiro", False)
+            da_normal = row.get("is_normal_dagostino", False)
+            if sw_normal and da_normal:
+                row["verdict"] = "Normal"
+            elif sw_normal or da_normal:
+                row["verdict"] = "Borderline"
+            else:
+                row["verdict"] = "Non-normal"
+
+            rows.append(row)
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
+
+
+def skewness_kurtosis(signals: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """
+    Section 4.2 — Skewness and kurtosis per signal value column.
+
+    Returns: signal, value_col, n, skewness, kurtosis,
+             shape_classification, recommended_transform.
+    """
+    rows = []
+    for sig_name, df in sorted(signals.items()):
+        if df is None or len(df) == 0:
+            continue
+        val_cols = VALUE_COLS.get(sig_name, [])
+        for vc in val_cols:
+            if vc not in df.columns:
+                continue
+            vals = df[vc].dropna().astype(float).values
             if len(vals) < 8:
                 continue
 
             skew = float(stats.skew(vals))
             kurt = float(stats.kurtosis(vals))
 
-            # Shapiro-Wilk on subsample (max 5000 for performance)
-            sub = vals[:5000] if len(vals) > 5000 else vals
-            try:
-                w_stat, p_val = stats.shapiro(sub)
-            except Exception:
-                w_stat, p_val = np.nan, np.nan
-            is_normal = bool(p_val > 0.05) if not np.isnan(p_val) else False
-
-            # Distribution shape classification
+            # Shape classification
             if abs(skew) < 0.5:
                 shape = "symmetric"
-            elif skew > 0.5:
+            elif skew > 0:
                 shape = "right-skewed"
             else:
                 shape = "left-skewed"
@@ -292,9 +410,11 @@ def distribution_analysis(
                 shape += " (leptokurtic)"
             elif kurt < -1:
                 shape += " (platykurtic)"
+            else:
+                shape += " (mesokurtic)"
 
             # Recommended transformation
-            if is_normal:
+            if abs(skew) < 0.5:
                 transform = "none"
             elif skew > 1.0 and np.all(vals > 0):
                 transform = "log"
@@ -307,151 +427,35 @@ def distribution_analysis(
 
             rows.append({
                 "signal": sig_name,
-                "value_col": val_col,
+                "value_col": vc,
+                "n": len(vals),
                 "skewness": round(skew, 4),
                 "kurtosis": round(kurt, 4),
-                "shapiro_W": round(float(w_stat), 4) if not np.isnan(w_stat) else np.nan,
-                "shapiro_p": round(float(p_val), 6) if not np.isnan(p_val) else np.nan,
-                "is_normal": is_normal,
-                "distribution_shape": shape,
+                "shape_classification": shape,
                 "recommended_transform": transform,
             })
-
     return pd.DataFrame(rows) if rows else pd.DataFrame()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# OUTLIER DETECTION
+# CONVENIENCE: RUN ALL QUALITY ASSESSMENTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def outlier_detection(
-    signals: Dict[str, pd.DataFrame],
-    method: str = "iqr",
-    iqr_factor: float = 1.5,
-) -> pd.DataFrame:
+def run_all_quality(signals: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     """
-    IBM EDA — Outlier detection using IQR or z-score method.
+    Run all data understanding and quality checks.
 
-    Parameters
-    ----------
-    signals    : {signal_name: DataFrame}
-    method     : 'iqr' or 'zscore'
-    iqr_factor : multiplier for IQR bounds (default 1.5)
-
-    Returns
-    -------
-    DataFrame with columns:
-      signal, value_col, method, n_total, n_outliers, pct_outliers,
-      lower_bound, upper_bound, outlier_min, outlier_max
+    Returns dict of DataFrames keyed by analysis name.
     """
-    rows = []
-    for sig_name, df in signals.items():
-        if df is None or len(df) == 0:
-            continue
-
-        val_cols = VALUE_COLS.get(sig_name, [])
-        if not val_cols:
-            val_cols = [c for c in df.columns
-                        if c not in ("timestamp_s", "target_label", "event_id",
-                                     "category")
-                        and pd.api.types.is_numeric_dtype(df[c])]
-
-        for val_col in val_cols:
-            if val_col not in df.columns:
-                continue
-            vals = df[val_col].dropna().astype(float)
-            n = len(vals)
-            if n < 4:
-                continue
-
-            if method == "iqr":
-                q1, q3 = np.percentile(vals, [25, 75])
-                iqr = q3 - q1
-                lower = q1 - iqr_factor * iqr
-                upper = q3 + iqr_factor * iqr
-            else:
-                mu, sigma = vals.mean(), vals.std()
-                lower = mu - 3 * sigma
-                upper = mu + 3 * sigma
-
-            outlier_mask = (vals < lower) | (vals > upper)
-            n_out = int(outlier_mask.sum())
-            outlier_vals = vals[outlier_mask]
-
-            rows.append({
-                "signal": sig_name,
-                "value_col": val_col,
-                "method": method,
-                "n_total": n,
-                "n_outliers": n_out,
-                "pct_outliers": round(100.0 * n_out / n, 2),
-                "lower_bound": round(float(lower), 4),
-                "upper_bound": round(float(upper), 4),
-                "outlier_min": round(float(outlier_vals.min()), 4) if n_out > 0 else np.nan,
-                "outlier_max": round(float(outlier_vals.max()), 4) if n_out > 0 else np.nan,
-            })
-
-    return pd.DataFrame(rows) if rows else pd.DataFrame()
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# INTER-SIGNAL CORRELATION
-# ─────────────────────────────────────────────────────────────────────────────
-
-def inter_signal_correlation(
-    signals: Dict[str, pd.DataFrame],
-) -> pd.DataFrame:
-    """
-    IBM EDA — Bivariate analysis: correlations between signals.
-
-    Computes Spearman rank correlation between all pairs of signals
-    at shared timestamps (nearest-neighbour join).
-
-    Returns
-    -------
-    DataFrame with columns:
-      signal_a, signal_b, spearman_rho, p_value, n_shared
-    """
-    # Build a common time-aligned DataFrame
-    sig_series = {}
-    for sig_name, df in signals.items():
-        if df is None or len(df) == 0 or "timestamp_s" not in df.columns:
-            continue
-        val_cols = VALUE_COLS.get(sig_name, [])
-        if not val_cols:
-            val_cols = [c for c in df.columns
-                        if c not in ("timestamp_s", "target_label", "event_id",
-                                     "category")
-                        and pd.api.types.is_numeric_dtype(df[c])]
-        if val_cols and val_cols[0] in df.columns:
-            sub = df[["timestamp_s", val_cols[0]]].dropna()
-            sub = sub.set_index("timestamp_s")
-            sig_series[sig_name] = sub.iloc[:, 0]
-
-    names = sorted(sig_series.keys())
-    rows = []
-    for i, a in enumerate(names):
-        for b in names[i+1:]:
-            # Align on nearest timestamp
-            sa = sig_series[a]
-            sb = sig_series[b]
-            merged = pd.merge_asof(
-                sa.reset_index().sort_values("timestamp_s"),
-                sb.reset_index().sort_values("timestamp_s"),
-                on="timestamp_s",
-                tolerance=0.5,
-                direction="nearest",
-            ).dropna()
-            n_shared = len(merged)
-            if n_shared < 10:
-                continue
-            rho, pval = stats.spearmanr(merged.iloc[:, 1], merged.iloc[:, 2])
-            rows.append({
-                "signal_a": a,
-                "signal_b": b,
-                "spearman_rho": round(float(rho), 4),
-                "p_value": round(float(pval), 6),
-                "n_shared": n_shared,
-            })
-
-    return pd.DataFrame(rows) if rows else pd.DataFrame()
+    return {
+        "signal_overview": signal_overview(signals),
+        "target_distribution": target_distribution(signals),
+        "user_label_matrix": user_label_matrix(signals),
+        "per_user_summary": per_user_summary(signals),
+        "missing_values": missing_values_report(signals),
+        "outlier_iqr": outlier_detection_iqr(signals),
+        "signal_range": signal_range_check(signals),
+        "sampling_rate": sampling_rate_check(signals),
+        "normality": normality_tests(signals),
+        "skewness_kurtosis": skewness_kurtosis(signals),
+    }

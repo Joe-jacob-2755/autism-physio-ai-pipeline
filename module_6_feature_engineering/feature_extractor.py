@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import warnings
 import numpy as np
+# NumPy 2.0 renamed trapz → trapezoid; support both versions
+_trapz = getattr(np, "trapezoid", np.trapz)
 import pandas as pd
 from scipy import signal as sp_signal
 from scipy.stats import skew, kurtosis, pearsonr
@@ -63,7 +65,7 @@ def _band_power(sig: np.ndarray, fs: float, lo: float, hi: float) -> float:
         return np.nan
     f, pxx = sp_signal.welch(sig, fs=fs, nperseg=nperseg)
     mask = (f >= lo) & (f <= hi)
-    return float(np.trapezoid(pxx[mask], f[mask])) if mask.sum() > 1 else np.nan
+    return float(_trapz(pxx[mask], f[mask])) if mask.sum() > 1 else np.nan
 
 
 def _dominant_freq(sig: np.ndarray, fs: float,
@@ -312,7 +314,7 @@ def extract_eda_features(sig: np.ndarray, fs: float,
     else:
         f["eda_scr_rise_mean"] = 0.0
         f["eda_scr_rec_time"] = 0.0
-    f["eda_scr_auc"] = _safe(np.trapezoid(np.maximum(phasic, 0)) / fs)
+    f["eda_scr_auc"] = _safe(_trapz(np.maximum(phasic, 0)) / fs)
 
     # ── Level 2: Time domain ─────────────────────────────────────────
     f["eda_mean"] = _safe(np.mean(sig))

@@ -19,6 +19,7 @@ Pipeline order (new):
   M5      -> Preprocess training data (clean + filter)
   [M5B]   -> Data augmentation (OPTIONAL, training only, if imbalanced)
   M6      -> Feature engineering (extract, select, reduce)
+  M7      -> Model training (global + user-dependent models)
 
 Test data is held out untouched until model evaluation.
 
@@ -64,6 +65,8 @@ M4_DIR = REPO_ROOT / "module_4_eda"
 M5_DIR = REPO_ROOT / "module_5_preprocessing"
 M5B_DIR = REPO_ROOT / "module_5b_data_augmentation"
 M6_DIR = REPO_ROOT / "module_6_feature_engineering"
+M7_DIR = REPO_ROOT / "module_7_model_training"
+M8_DIR = REPO_ROOT / "module_8_model_evaluation"
 
 # Names of modules that conflict across pipeline modules
 _CONFLICTING_MODULES = {
@@ -77,6 +80,8 @@ _CONFLICTING_MODULES = {
     "imbalance_detector", "augmentation_planner", "augmenter",
     "tgan_model", "tgan_trainer", "signal_generator", "sanity_checker",
     "selection_report",
+    "trainer", "evaluator", "class_balancer", "data_loader",
+    "models", "report_generator", "xai",
 }
 
 WIDTH = 66
@@ -127,6 +132,8 @@ def _detect_modules() -> dict:
         ("M5", "Preprocessing", M5_DIR, "preprocessor.py"),
         ("M5B", "Data Augmentation (optional)", M5B_DIR, "augmenter.py"),
         ("M6", "Feature Engineering", M6_DIR, "feature_engineer.py"),
+        ("M7", "Model Training", M7_DIR, "trainer.py"),
+        ("M8", "Model Evaluation", M8_DIR, "main.py"),
     ]
 
     for label, name, directory, key_file in checks:
@@ -232,20 +239,15 @@ def run_m3_split(packets, seed, output_dir=None):
         }
 
 
-def run_m4_eda(source, session_id, user_id, output_dir=None):
-    """Run Module 4 Exploratory Data Analysis (IBM EDA, train only)."""
+def run_m4_eda(packets_by_uid, train_users, demographics_by_uid=None,
+               output_dir=None):
+    """Run Module 4 Exploratory Data Analysis (combined multi-user)."""
     with _isolated_import(M4_DIR):
-        from analyser import ExploratoryDataAnalyser
-        eda = ExploratoryDataAnalyser(
-            threshold_window_s=300.0,
-            threshold_mad_factor=3.0,
-            threshold_sustain_s=30.0,
-            verbose=True,
-        )
+        from analyser import CombinedEDA
+        eda = CombinedEDA(verbose=True)
         return eda.run(
-            source=source,
-            session_id=session_id,
-            user_id=user_id,
+            source={"packets": packets_by_uid, "train_users": train_users},
+            demographics=demographics_by_uid,
             output_dir=output_dir,
         )
 
@@ -664,6 +666,47 @@ def fetch_data_from_github(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# M7 — MODEL TRAINING
+# ─────────────────────────────────────────────────────────────────────────────
+
+def run_m7_model_training(source, output_dir, seed=42,
+                          skip_temporal=False, skip_unsupervised=False,
+                          per_user_dir=None):
+    """Run Module 7 model training on combined features from M6."""
+    with _isolated_import(M7_DIR):
+        from main import run_module_7
+
+        return run_module_7(
+            source=source,
+            output_dir=Path(output_dir),
+            seed=seed,
+            verbose=True,
+            skip_temporal=skip_temporal,
+            skip_unsupervised=skip_unsupervised,
+            user_dependent=per_user_dir is not None,
+            per_user_dir=per_user_dir,
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# M8 — MODEL EVALUATION
+# ─────────────────────────────────────────────────────────────────────────────
+
+def run_m8_model_evaluation(m7_dir, features_csv, output_dir, seed=42):
+    """Run Module 8 model evaluation on the held-out test set."""
+    with _isolated_import(M8_DIR):
+        from main import run_module_8
+
+        return run_module_8(
+            m7_dir=str(m7_dir),
+            features_csv=str(features_csv),
+            output_dir=str(output_dir),
+            seed=seed,
+            verbose=True,
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # RESULT DISPLAY
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -738,6 +781,8 @@ def run_auto_pipeline(
     gen_plots: bool = True,
     open_report: bool = True,
     skip_m5b: bool = False,
+    skip_m7: bool = False,
+    stop_after: str = None,
 ):
     """
     Run the full pipeline non-interactively with defaults.
@@ -773,6 +818,8 @@ def run_auto_pipeline(
     if "M6" in available:
         total_steps += 1
         total_steps += 1  # cross-user aggregation + data export
+    if "M7" in available:
+        total_steps += 1
 
     print(f"  Pipeline: {' -> '.join(module_list)}")
     print(f"  Users: {n_users}  |  Duration: {duration_s:.0f}s  |  "
@@ -884,39 +931,40 @@ def run_auto_pipeline(
     if "M4" in available:
         step += 1
         _step(step, total_steps,
-              "Exploratory Data Analysis  (M4) -- TRAINING ONLY")
+              "Exploratory Data Analysis  (M4) -- COMBINED TRAINING DATA")
 
         m4_out = module_subdir(run_folder, "module_4_eda")
 
-        for uid in train_users:
-            if uid not in packets_by_uid:
-                continue
-            pkt = packets_by_uid[uid]
-            sid = getattr(pkt, "session_id", "session_001")
-            user_m4_dir = user_subdir(m4_out, uid)
-
-            print(f"\n  EDA [{uid}] (train) ...")
-            try:
-                # Pass raw signals directly
-                source_dict = {"signals": pkt.signals if hasattr(pkt, "signals") else {}}
-                m4_result = run_m4_eda(
-                    source=source_dict,
-                    session_id=sid,
-                    user_id=uid,
-                    output_dir=str(user_m4_dir),
-                )
-                m4_results.append(m4_result)
-            except Exception as e:
-                print(f"  [WARN] M4 EDA failed for {uid}: {e}")
-
-        if m4_results:
+        try:
+            m4_result = run_m4_eda(
+                packets_by_uid=packets_by_uid,
+                train_users=train_users,
+                demographics_by_uid=demographics_by_uid,
+                output_dir=str(m4_out),
+            )
+            m4_results.append(m4_result)
             manifest.record_module("M4", m4_out, {
-                "n_users": len(m4_results),
-                "data_scope": "training_only",
+                "n_users": len(train_users),
+                "data_scope": "combined_training",
             })
             manifest.save()
-            _ok(f"Module 4 complete -- {len(m4_results)} users analysed "
-                f"(training data only)")
+            _ok(f"Module 4 complete -- {len(train_users)} users analysed "
+                f"(combined training data)")
+        except Exception as e:
+            print(f"  [WARN] M4 EDA failed: {e}")
+            import traceback
+            traceback.print_exc()
+
+    # ── Early stop check ────────────────────────────────────────────────
+    _STOP_ORDER = ["M1", "M3", "M4", "M5", "M5B", "M6", "M7", "M8"]
+    if stop_after and stop_after in _STOP_ORDER:
+        stop_idx = _STOP_ORDER.index(stop_after)
+        if stop_idx <= 2:  # M1, M3, or M4
+            elapsed = time.time() - t_start
+            _ok(f"Pipeline stopped after {stop_after} "
+                f"(--stop_after). Total time: {elapsed:.1f}s")
+            manifest.save()
+            return run_folder
 
     # ══════════════════════════════════════════════════════════════════════
     # STEP 4: M5 -- Preprocessing  (train + val users only)
@@ -1074,6 +1122,124 @@ def run_auto_pipeline(
                 traceback.print_exc()
 
     # ══════════════════════════════════════════════════════════════════════
+    # STEP 7: M7 -- Model Training (global models on combined data)
+    # ══════════════════════════════════════════════════════════════════════
+    m7_out = None
+    if "M7" in available and m6_results and not skip_m7:
+        step += 1
+        _step(step, total_steps, "Model Training  (M7) -- global models")
+
+        m7_out_dir = module_subdir(run_folder, "module_7_model_training")
+
+        # Find the combined features CSV from M6 aggregation
+        combined_csv = None
+        combined_dir = run_folder / "module_6_feature_engineering" / "combined_all_users"
+        if combined_dir.exists():
+            candidates = [
+                combined_dir / "combined_features_all_users_split.csv",
+                combined_dir / "combined_features_all_users.csv",
+            ]
+            for c in candidates:
+                if c.exists():
+                    combined_csv = c
+                    break
+        if combined_csv is None:
+            # Search broader
+            csvs = list(run_folder.rglob("combined_features_all_users*.csv"))
+            if csvs:
+                combined_csv = csvs[0]
+
+        if combined_csv:
+            print(f"\n  Training on: {combined_csv.name}")
+            try:
+                # Find per-user data for user-dependent models
+                per_user_m6 = run_folder / "module_6_feature_engineering"
+                per_user_dirs = [
+                    d for d in per_user_m6.iterdir()
+                    if d.is_dir() and d.name.startswith("user_")]
+                per_user = per_user_m6 if per_user_dirs else None
+
+                m7_out = run_m7_model_training(
+                    source=str(combined_csv),
+                    output_dir=str(m7_out_dir),
+                    seed=seed,
+                    skip_temporal=False,
+                    skip_unsupervised=False,
+                    per_user_dir=per_user,
+                )
+                manifest.record_module("M7", m7_out_dir, {
+                    "source": str(combined_csv),
+                })
+                manifest.save()
+                _ok("Module 7 complete -- models trained and compared")
+            except Exception as e:
+                print(f"  [WARN] M7 failed: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("  [WARN] No combined features CSV found for M7")
+            _skip("M7 skipped -- no combined features")
+
+    # ══════════════════════════════════════════════════════════════════════
+    # STEP 8: M8 -- Model Evaluation (held-out test set)
+    # ══════════════════════════════════════════════════════════════════════
+    m8_out = None
+    if "M8" in available and m7_out is not None:
+        step += 1
+        _step(step, total_steps, "Model Evaluation  (M8) -- held-out test set")
+
+        m8_out_dir = module_subdir(run_folder, "module_8_model_evaluation")
+
+        # Locate M7 output dir and combined features CSV
+        m7_out_dir = run_folder / "module_7_model_training"
+
+        combined_csv = None
+        combined_dir = run_folder / "module_6_feature_engineering" / "combined_all_users"
+        if combined_dir.exists():
+            candidates = [
+                combined_dir / "combined_features_all_users_split.csv",
+                combined_dir / "combined_features_all_users.csv",
+            ]
+            for c in candidates:
+                if c.exists():
+                    combined_csv = c
+                    break
+        if combined_csv is None:
+            csvs = list(run_folder.rglob("combined_features_all_users*.csv"))
+            if csvs:
+                combined_csv = csvs[0]
+
+        if combined_csv and m7_out_dir.exists():
+            print(f"\n  Evaluating models on test set...")
+            print(f"  M7 dir:     {m7_out_dir}")
+            print(f"  Features:   {combined_csv.name}")
+            try:
+                m8_out = run_m8_model_evaluation(
+                    m7_dir=m7_out_dir,
+                    features_csv=combined_csv,
+                    output_dir=m8_out_dir,
+                    seed=seed,
+                )
+                manifest.record_module("M8", m8_out_dir, {
+                    "best_model": m8_out.get("best_model"),
+                    "best_test_f1": m8_out.get("best_test_f1"),
+                })
+                manifest.save()
+                _ok(f"Module 8 complete -- best model: "
+                    f"{m8_out.get('best_model', '?')} "
+                    f"(F1={m8_out.get('best_test_f1', 0):.4f})")
+            except Exception as e:
+                print(f"  [WARN] M8 failed: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            if not combined_csv:
+                print("  [WARN] No combined features CSV found for M8")
+            if not m7_out_dir.exists():
+                print("  [WARN] M7 output directory not found for M8")
+            _skip("M8 skipped -- missing M7 output or features CSV")
+
+    # ══════════════════════════════════════════════════════════════════════
     # FINALISE
     # ══════════════════════════════════════════════════════════════════════
     manifest.complete()
@@ -1144,6 +1310,12 @@ Examples:
                         help="Do not open EDA report in browser")
     parser.add_argument("--skip_m5b", action="store_true",
                         help="Skip M5B data augmentation (slow on CPU)")
+    parser.add_argument("--skip_m7", action="store_true",
+                        help="Skip M7 model training")
+    parser.add_argument("--stop_after", type=str, default=None,
+                        choices=["M1", "M3", "M4", "M5", "M5B", "M6", "M7", "M8"],
+                        help="Stop pipeline after this module "
+                             "(e.g. --stop_after M4 for EDA only)")
     parser.add_argument("--fetch_github", action="store_true",
                         help="Fetch existing data from GitHub data/ folder "
                              "instead of simulating")
@@ -1169,4 +1341,6 @@ Examples:
             gen_plots=not args.no_plots,
             open_report=not args.no_report,
             skip_m5b=args.skip_m5b,
+            skip_m7=args.skip_m7,
+            stop_after=args.stop_after,
         )

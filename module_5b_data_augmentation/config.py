@@ -219,6 +219,30 @@ SEVERITY_TO_IDX = {"Low": 0, "Medium": 1, "Severe": 2}
 VERBAL_TO_IDX = {"Verbal": 0, "Minimally verbal": 1, "Non-verbal": 2}
 
 # ═════════════════════════════════════════════════════════════════════════════
+# SMOTE (feature-level augmentation — alternative to CT-TimeGAN)
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# SMOTE operates on extracted feature vectors (post M6) rather than raw
+# signals. It is faster and deterministic but cannot preserve temporal
+# signal morphology. Use as complement to or fallback for CT-TimeGAN.
+#
+# Methods:
+#   "smote"             -> standard SMOTE (Chawla et al., 2002)
+#   "borderline_smote"  -> focus on decision boundary samples (Han et al., 2005)
+#   "adasyn"            -> adaptive synthetic (He et al., 2008)
+#   "random_oversample" -> duplicate minority samples (no synthesis)
+# ═════════════════════════════════════════════════════════════════════════════
+
+SMOTE = {
+    "default_method": "smote",
+    "default_k_neighbors": 5,
+    "min_k_neighbors": 1,
+    "min_samples_for_smote": 2,       # Need >= k+1 samples per class
+    "min_samples_for_adasyn": 6,      # ADASYN needs more boundary diversity
+    "min_samples_for_borderline": 6,  # BorderlineSMOTE needs boundary samples
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
 # OUTPUT
 # ═════════════════════════════════════════════════════════════════════════════
 

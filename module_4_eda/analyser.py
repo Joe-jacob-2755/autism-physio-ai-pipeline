@@ -1,475 +1,323 @@
 """
 =============================================================================
-MODULE 4 – EXPLORATORY DATA ANALYSIS  |  analyser.py
+MODULE 4 - EXPLORATORY DATA ANALYSIS  |  analyser.py
 =============================================================================
-ExploratoryDataAnalyser — master orchestrator following IBM Data Science
-Methodology for EDA.
+CombinedEDA — master orchestrator for the 10-phase EDA pipeline.
 
-This module runs on TRAINING DATA ONLY.  Test data is never seen.
-
-IBM EDA Pipeline (7 Phases):
-  Phase 1: Data Understanding — shape, types, summary statistics
-  Phase 2: Data Quality Assessment — missing, outliers, consistency
-  Phase 3: Distribution Analysis — skewness, normality, transforms
-  Phase 4: Univariate Analysis — per-signal descriptive + boxplots
-  Phase 5: Bivariate Analysis — correlations, group comparisons
-  Phase 6: Temporal Analysis — signal dynamics, event response patterns
-  Phase 7: Key Findings — comprehensive HTML report + recommendations
-
-Accepts:
-  - Direct dict of signal DataFrames  {name: DataFrame}
-  - A folder path containing raw signal CSVs (EDA.csv, BVP.csv, etc.)
-
-Produces:
-  - Data quality report CSV
-  - Distribution analysis CSV
-  - Outlier detection CSV
-  - Descriptive statistics CSV
-  - Correlation analyses
-  - Temporal dynamics analysis
-  - Comprehensive HTML report
-  - All visualisations (2D + 3D)
+Loads combined multi-user data, runs all analyses, generates all charts,
+and builds the thesis-quality Word report.
 =============================================================================
 """
 from __future__ import annotations
-from config import MODULE_VERSION, MODULE_LABEL, OUTPUT_ROOT, META_COLS
 
-import re
-import sys
 import json
 import time
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
 
-MODULE_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(MODULE_DIR))
+from config import MODULE_VERSION, MODULE_LABEL, OUTPUT_ROOT
+from combined_loader import CombinedDataLoader, CombinedData
+from data_quality import run_all_quality
+from statistical_analyser import run_all_statistics
+from correlation_analyser import run_all_correlations
+from signal_analyser import SignalAnalyser, signal_pct_change_summary, time_to_peak_summary
+from visualiser import EDAVisualiser
+from report_builder import DocxReportBuilder
+
+log = logging.getLogger(__name__)
 
 
-def _next_run_folder(custom_name: str = None) -> Path:
-    output_root = MODULE_DIR / OUTPUT_ROOT
-    output_root.mkdir(parents=True, exist_ok=True)
-    vtag = f"{MODULE_LABEL}_v{MODULE_VERSION}"
-    prefix = custom_name or f"{vtag}_run"
-    pattern = re.compile(rf"^{re.escape(prefix)}_(\d+)$")
-    existing = [int(m.group(1)) for d in output_root.iterdir()
-                if d.is_dir() and (m := pattern.match(d.name))]
-    n = (max(existing) + 1) if existing else 1
-    folder = output_root / f"{prefix}_{n:03d}"
-    folder.mkdir(parents=True)
-    return folder
+@dataclass
+class AnalysisResults:
+    """Container for all EDA analysis outputs."""
+    quality: Dict[str, pd.DataFrame] = field(default_factory=dict)
+    statistics: Dict[str, pd.DataFrame] = field(default_factory=dict)
+    correlations: Dict[str, Any] = field(default_factory=dict)
+    temporal: Dict[str, Any] = field(default_factory=dict)
+    plot_paths: Dict[str, Any] = field(default_factory=dict)
+    report_path: Optional[Path] = None
+    output_dir: Optional[Path] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
-class ExploratoryDataAnalyser:
+class CombinedEDA:
     """
-    Module 4 — IBM EDA master analysis pipeline.
+    Master orchestrator for Module 4 combined multi-user EDA.
 
-    Runs on TRAINING data only.  Test data must never be passed here.
-
-    Parameters
-    ----------
-    threshold_window_s   : adaptive threshold rolling window in seconds
-    threshold_mad_factor : deviation trigger (N x MAD from running median)
-    threshold_sustain_s  : minimum sustained duration to flag (seconds)
-    out_name             : custom output folder name (auto-numbered if None)
-    verbose              : print progress
+    Usage
+    -----
+    eda = CombinedEDA(verbose=True)
+    results = eda.run(
+        source={"packets": packets_by_uid, "train_users": train_users},
+        demographics=demographics_by_uid,
+        output_dir="outputs/run_001/module_4_eda",
+    )
     """
 
-    def __init__(
-        self,
-        threshold_window_s: float = 300.0,
-        threshold_mad_factor: float = 3.0,
-        threshold_sustain_s: float = 30.0,
-        out_name: str = None,
-        verbose: bool = True,
-    ):
-        self.threshold_window_s = threshold_window_s
-        self.threshold_mad_factor = threshold_mad_factor
-        self.threshold_sustain_s = threshold_sustain_s
-        self.out_name = out_name
+    def __init__(self, verbose: bool = True):
         self.verbose = verbose
 
-    # ── Public API ─────────────────────────────────────────────────────────
+    def _log(self, msg: str):
+        if self.verbose:
+            print(f"  [{MODULE_LABEL}] {msg}")
 
     def run(
         self,
-        source: Union[str, Path, dict],
-        session_id: str = "unknown",
-        user_id: str = "unknown",
-        output_dir: str = None,
-    ) -> dict:
+        source: Dict[str, Any],
+        demographics: Optional[Dict[str, dict]] = None,
+        output_dir: Optional[str | Path] = None,
+    ) -> AnalysisResults:
         """
-        Run IBM EDA pipeline (7 phases) on training data.
+        Run the full 10-phase EDA pipeline.
 
         Parameters
         ----------
-        source : folder path with raw signal CSVs, or dict with key
-                 'signals' -> {name: DataFrame}
+        source : dict with either:
+            {"packets": {uid: PipelinePacket}, "train_users": [uid, ...]}
+            or {"folders": {uid: Path}}
+        demographics : {uid: {age, gender, ...}} or None
+        output_dir : output directory (created if missing)
+
+        Returns
+        -------
+        AnalysisResults with all analysis outputs
         """
         t0 = time.time()
-        if output_dir is not None:
-            run_folder = Path(output_dir)
-            run_folder.mkdir(parents=True, exist_ok=True)
+        results = AnalysisResults()
+
+        # ── Phase 0: Setup output directory ────────────────────────────────
+        if output_dir is None:
+            output_dir = self._auto_output_dir()
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        results.output_dir = output_dir
+        self._log(f"Output: {output_dir}")
+
+        # ── Phase 1: Load and combine data ─────────────────────────────────
+        self._log("Phase 1/10: Loading and combining data...")
+        loader = CombinedDataLoader(verbose=self.verbose)
+        if "packets" in source:
+            combined = loader.load_from_packets(
+                source["packets"], source["train_users"], demographics
+            )
+        elif "folders" in source:
+            combined = loader.load_from_folders(source["folders"], demographics)
         else:
-            run_folder = _next_run_folder(self.out_name)
+            raise ValueError("source must contain 'packets' or 'folders' key")
 
-        self._log("=" * 64)
-        self._log(f"  MODULE {MODULE_LABEL}  --  Exploratory Data Analysis (IBM EDA)")
-        self._log(f"  Version: v{MODULE_VERSION}")
-        self._log(f"  Session: {session_id}  |  User: {user_id}")
-        self._log(f"  NOTE: Training data only -- test data is held out")
+        self._log(f"  Combined: {combined.n_users} users, "
+                  f"{len(combined.signals)} signals, "
+                  f"{combined.total_duration_s / 3600:.1f} hours")
+
+        # ── Phase 2: Data quality assessment ───────────────────────────────
+        self._log("Phase 2/10: Data quality assessment...")
+        results.quality = run_all_quality(combined.signals)
+
+        # ── Phase 3: Statistical analysis ──────────────────────────────────
+        self._log("Phase 3/10: Statistical analysis...")
+        results.statistics = run_all_statistics(
+            combined.signals, combined.demographics
+        )
+
+        # ── Phase 4: Correlational analysis ────────────────────────────────
+        self._log("Phase 4/10: Correlational analysis...")
+        results.correlations = run_all_correlations(combined.signals)
+
+        # ── Phase 5: Temporal event dynamics ───────────────────────────────
+        self._log("Phase 5/10: Temporal event dynamics...")
+        analyser = SignalAnalyser(verbose=self.verbose)
+        temporal_raw = analyser.analyse_all(combined.signals)
+        dynamics_df = temporal_raw.get("event_dynamics", pd.DataFrame())
+
+        # Add summary tables
+        temporal_raw["pct_change_summary"] = signal_pct_change_summary(dynamics_df)
+        temporal_raw["time_to_peak_summary"] = time_to_peak_summary(dynamics_df)
+        results.temporal = temporal_raw
+
+        # ── Phase 6: Export CSV tables ─────────────────────────────────────
+        self._log("Phase 6/10: Exporting CSV tables...")
+        csv_dir = output_dir / "summary_tables"
+        csv_dir.mkdir(exist_ok=True)
+        self._export_csvs(results, csv_dir)
+
+        # ── Phase 7: Generate visualisations ───────────────────────────────
+        self._log("Phase 7/10: Generating visualisations...")
+        vis = EDAVisualiser(output_dir, dpi=200)
+        plot_paths = self._generate_all_plots(
+            vis, combined, results
+        )
+        results.plot_paths = plot_paths
+
+        # ── Phase 8: Build Word report ─────────────────────────────────────
+        self._log("Phase 8/10: Building Word report...")
+        metadata = {
+            "module": MODULE_LABEL,
+            "version": MODULE_VERSION,
+            "n_users": combined.n_users,
+            "user_ids": combined.user_ids,
+            "total_duration_s": combined.total_duration_s,
+            "n_signals": len(combined.signals),
+            "signal_names": list(combined.signals.keys()),
+            "timestamp": datetime.now().isoformat(),
+        }
+        results.metadata = metadata
+
         try:
-            _rel = run_folder.relative_to(MODULE_DIR)
-        except ValueError:
-            try:
-                _rel = run_folder.relative_to(MODULE_DIR.parent)
-            except ValueError:
-                _rel = run_folder
-        self._log(f"  Output:  {_rel}")
-        self._log("=" * 64)
+            builder = DocxReportBuilder(verbose=self.verbose)
+            results.report_path = builder.build(
+                output_dir, results.quality, results.statistics,
+                results.correlations, results.temporal,
+                plot_paths, metadata,
+            )
+        except Exception as e:
+            self._log(f"WARNING: Report generation failed: {e}")
+            results.report_path = None
 
-        # ── Load data ─────────────────────────────────────────────────────
-        signals, features, combined = self._load(source)
-
-        self._log(f"\n  Signals loaded:  {list(signals.keys())}")
-        if features:
-            self._log(f"  Features loaded: {list(features.keys())}")
-        self._log(f"  Combined shape:  {combined.shape}")
-
-        # Create summary tables directory
-        tables_dir = run_folder / "summary_tables"
-        tables_dir.mkdir(parents=True, exist_ok=True)
-
-        # ══════════════════════════════════════════════════════════════════
-        # PHASE 1: DATA UNDERSTANDING (IBM EDA Step 1)
-        # ══════════════════════════════════════════════════════════════════
-        self._log("\n[M4] Phase 1/7 -- Data Understanding ...")
-        from data_quality import data_understanding
-        understanding_df = data_understanding(signals)
-        if not understanding_df.empty:
-            understanding_df.to_csv(
-                tables_dir / "data_understanding.csv", index=False)
-            self._log(f"  {len(understanding_df)} signals characterised")
-            for _, row in understanding_df.iterrows():
-                self._log(f"    {row['signal']}: {row['n_rows']:,} samples, "
-                          f"{row.get('sampling_rate_hz', '?')} Hz, "
-                          f"{row.get('duration_s', '?')}s")
-
-        # ══════════════════════════════════════════════════════════════════
-        # PHASE 2: DATA QUALITY ASSESSMENT (IBM EDA Step 2)
-        # ══════════════════════════════════════════════════════════════════
-        self._log("\n[M4] Phase 2/7 -- Data Quality Assessment ...")
-        from data_quality import data_quality_report, outlier_detection
-        quality_df = data_quality_report(signals)
-        if not quality_df.empty:
-            quality_df.to_csv(
-                tables_dir / "data_quality_report.csv", index=False)
-            for _, row in quality_df.iterrows():
-                self._log(f"    {row['signal']}/{row['value_col']}: "
-                          f"missing={row['pct_missing']:.1f}%, "
-                          f"outliers_oor={row['pct_out_of_range']:.1f}%, "
-                          f"grade={row['quality_grade']}")
-
-        outlier_df = outlier_detection(signals, method="iqr")
-        if not outlier_df.empty:
-            outlier_df.to_csv(
-                tables_dir / "outlier_detection.csv", index=False)
-            self._log(f"  Outlier detection: {len(outlier_df)} channels assessed")
-
-        # ══════════════════════════════════════════════════════════════════
-        # PHASE 3: DISTRIBUTION ANALYSIS (IBM EDA Step 3)
-        # ══════════════════════════════════════════════════════════════════
-        self._log("\n[M4] Phase 3/7 -- Distribution Analysis ...")
-        from data_quality import distribution_analysis
-        dist_df = distribution_analysis(signals)
-        if not dist_df.empty:
-            dist_df.to_csv(
-                tables_dir / "distribution_analysis.csv", index=False)
-            for _, row in dist_df.iterrows():
-                self._log(f"    {row['signal']}/{row['value_col']}: "
-                          f"skew={row['skewness']:.2f}, "
-                          f"shape={row['distribution_shape']}, "
-                          f"transform={row['recommended_transform']}")
-
-        # ══════════════════════════════════════════════════════════════════
-        # PHASE 4: UNIVARIATE ANALYSIS (IBM EDA Step 4)
-        # ══════════════════════════════════════════════════════════════════
-        self._log("\n[M4] Phase 4/7 -- Univariate Analysis (descriptive stats) ...")
-        from statistical_analyser import descriptive_analysis
-        desc_df = descriptive_analysis(combined) if not combined.empty else pd.DataFrame()
-        if not desc_df.empty:
-            desc_df.to_csv(tables_dir / "descriptive_statistics.csv", index=False)
-            self._log(f"  Descriptive: {len(desc_df)} rows")
-
-        # ══════════════════════════════════════════════════════════════════
-        # PHASE 5: BIVARIATE & MULTIVARIATE ANALYSIS (IBM EDA Step 5)
-        # ══════════════════════════════════════════════════════════════════
-        self._log("\n[M4] Phase 5/7 -- Bivariate & Multivariate Analysis ...")
-        from statistical_analyser import (
-            kruskal_wallis_analysis, pairwise_mannwhitney,
-            correlation_feature_target, correlation_feature_matrix,
-            signal_pct_change_summary,
-        )
-        from data_quality import inter_signal_correlation
-
-        # Inter-signal correlations (bivariate on raw signals)
-        inter_corr_df = inter_signal_correlation(signals)
-        if not inter_corr_df.empty:
-            inter_corr_df.to_csv(
-                tables_dir / "inter_signal_correlation.csv", index=False)
-            self._log(f"  Inter-signal correlations: {len(inter_corr_df)} pairs")
-
-        # Feature-level statistics (if features available)
-        kw_df = kruskal_wallis_analysis(combined) if not combined.empty else pd.DataFrame()
-        top_feats = kw_df[kw_df["significant"]].head(20)["feature"].tolist() \
-            if not kw_df.empty and "significant" in kw_df.columns else None
-        pair_df = pairwise_mannwhitney(combined, top_features=top_feats) \
-            if not combined.empty else pd.DataFrame()
-        corr_t_df = correlation_feature_target(combined) \
-            if not combined.empty else pd.DataFrame()
-        corr_m_df, _feats = correlation_feature_matrix(combined) \
-            if not combined.empty else (pd.DataFrame(), [])
-
-        if not kw_df.empty:
-            kw_df.to_csv(tables_dir / "kruskal_wallis_results.csv", index=False)
-            n_sig = int(kw_df['significant'].sum()) if 'significant' in kw_df.columns else 0
-            self._log(f"  Kruskal-Wallis: {n_sig} significant features")
-        if not pair_df.empty:
-            pair_df.to_csv(tables_dir / "pairwise_mannwhitney.csv", index=False)
-        if not corr_t_df.empty:
-            corr_t_df.to_csv(tables_dir / "correlation_feature_target.csv", index=False)
-            self._log(f"  Corr target: {len(corr_t_df)} features")
-        if not corr_m_df.empty:
-            corr_m_df.to_csv(tables_dir / "correlation_matrix.csv", index=False)
-
-        # ══════════════════════════════════════════════════════════════════
-        # PHASE 6: TEMPORAL ANALYSIS (IBM EDA Step 6)
-        # ══════════════════════════════════════════════════════════════════
-        self._log("\n[M4] Phase 6/7 -- Temporal Analysis ...")
-        from signal_analyser import SignalAnalyser
-        sig_results = SignalAnalyser(
-            threshold_window_s=self.threshold_window_s,
-            threshold_mad_factor=self.threshold_mad_factor,
-            threshold_sustain_s=self.threshold_sustain_s,
-            verbose=self.verbose,
-        ).analyse_all(signals)
-
-        pct_df = signal_pct_change_summary(sig_results["event_dynamics"])
-
-        # Save temporal tables
-        if not sig_results["event_dynamics"].empty:
-            sig_results["event_dynamics"].to_csv(
-                tables_dir / "temporal_dynamics.csv", index=False)
-        if not sig_results["return_summary"].empty:
-            sig_results["return_summary"].to_csv(
-                tables_dir / "return_to_median_summary.csv", index=False)
-        if not sig_results["threshold_events"].empty:
-            sig_results["threshold_events"].to_csv(
-                tables_dir / "threshold_events.csv", index=False)
-        if not pct_df.empty:
-            pct_df.to_csv(tables_dir / "pct_change_summary.csv", index=False)
-
-        # ══════════════════════════════════════════════════════════════════
-        # PHASE 7: VISUALISATIONS & REPORT (IBM EDA Step 7)
-        # ══════════════════════════════════════════════════════════════════
-        self._log("\n[M4] Phase 7/7 -- Generating visualisations & report ...")
-        from visualiser import AnalysisVisualiser
-        vis = AnalysisVisualiser(run_folder)
-        plots = {}
-
-        plots.update(vis.plot_descriptive_boxplots(features))
-        p = vis.plot_pct_change(pct_df)
-        if p:
-            plots["pct_change"] = p
-        p = vis.plot_temporal_dynamics(sig_results["event_dynamics"])
-        if p:
-            plots["temporal"] = p
-        p = vis.plot_return_rate(sig_results["return_summary"])
-        if p:
-            plots["return_rate"] = p
-        p = vis.plot_significant_features(kw_df)
-        if p:
-            plots["kruskal"] = p
-        p = vis.plot_correlation_target(corr_t_df)
-        if p:
-            plots["corr_target"] = p
-        p = vis.plot_correlation_matrix(corr_m_df)
-        if p:
-            plots["corr_matrix"] = p
-        plots.update(vis.plot_threshold_overlay(
-            sig_results["median_drift"],
-            sig_results["threshold_events"],
-            self.threshold_mad_factor,
-        ))
-        p3d = vis.plot_3d_signals(signals)
-        if p3d:
-            plots["3d_html"] = p3d
-            png_3d = run_folder / "3d_signals.png"
-            if png_3d.exists():
-                plots["3d_png"] = png_3d
-        p = vis.plot_median_drift(sig_results["event_dynamics"])
-        if p:
-            plots["median_drift"] = p
-
-        self._log(f"  Plots generated: {len(plots)}")
-
-        # ── HTML Report ────────────────────────────────────────────────────
-        from reporter import AnalysisReporter
-        meta = {
-            "session_id": session_id,
-            "user_id": user_id,
-            "module_version": MODULE_VERSION,
-            "module_label": MODULE_LABEL,
-            "analysis_type": "IBM Exploratory Data Analysis",
-            "data_scope": "TRAINING DATA ONLY",
-            "window_s": self.threshold_window_s,
-            "mad_factor": self.threshold_mad_factor,
-            "sustain_s": self.threshold_sustain_s,
-            "n_signals": len(signals),
-            "n_feature_cols": combined.shape[1] if not combined.empty else 0,
-            "n_windows": len(combined),
-        }
-        AnalysisReporter(run_folder).generate(
-            session_id=session_id,
-            user_id=user_id,
-            metadata=meta,
-            descriptive_df=desc_df,
-            kruskal_df=kw_df,
-            pairwise_df=pair_df,
-            corr_target_df=corr_t_df,
-            corr_matrix_df=corr_m_df,
-            dynamics_df=sig_results["event_dynamics"],
-            return_df=sig_results["return_summary"],
-            pct_change_df=pct_df,
-            threshold_df=sig_results["threshold_events"],
-            plot_paths=plots,
-        )
-
-        # ── Metadata JSON ──────────────────────────────────────────────────
-        meta["elapsed_s"] = round(time.time() - t0, 2)
-        # Add IBM EDA phase summaries
-        meta["phases"] = {
-            "1_data_understanding": {
-                "signals": len(understanding_df) if not understanding_df.empty else 0
-            },
-            "2_data_quality": {
-                "channels_assessed": len(quality_df) if not quality_df.empty else 0,
-                "outlier_channels": len(outlier_df) if not outlier_df.empty else 0,
-            },
-            "3_distribution": {
-                "distributions_analysed": len(dist_df) if not dist_df.empty else 0
-            },
-            "4_univariate": {
-                "descriptive_rows": len(desc_df)
-            },
-            "5_bivariate": {
-                "inter_signal_pairs": len(inter_corr_df) if not inter_corr_df.empty else 0,
-                "kruskal_significant": int(kw_df['significant'].sum()) if not kw_df.empty and 'significant' in kw_df.columns else 0,
-            },
-            "6_temporal": {
-                "events_analysed": len(sig_results["event_dynamics"]),
-                "threshold_events": len(sig_results["threshold_events"]),
-            },
-            "7_report": {
-                "plots_generated": len(plots),
-            },
-        }
-        with open(run_folder / "eda_metadata.json", "w") as f:
-            json.dump(meta, f, indent=2, default=str)
-
+        # ── Phase 9: Save metadata ─────────────────────────────────────────
+        self._log("Phase 9/10: Saving metadata...")
         elapsed = time.time() - t0
-        self._log(f"\n[M4] EDA complete in {elapsed:.1f}s  ->  {run_folder}\n")
+        metadata["elapsed_s"] = round(elapsed, 1)
+        meta_path = output_dir / "eda_metadata.json"
+        with open(meta_path, "w") as f:
+            json.dump(metadata, f, indent=2, default=str)
 
-        return {
-            "run_folder": run_folder,
-            "understanding": understanding_df,
-            "quality": quality_df,
-            "distribution": dist_df,
-            "outliers": outlier_df,
-            "inter_signal_corr": inter_corr_df,
-            "descriptive": desc_df,
-            "kruskal": kw_df,
-            "pairwise": pair_df,
-            "corr_target": corr_t_df,
-            "event_dynamics": sig_results["event_dynamics"],
-            "return_summary": sig_results["return_summary"],
-            "threshold_events": sig_results["threshold_events"],
-            "pct_change": pct_df,
-            "plots": plots,
-        }
+        # ── Phase 10: Summary ──────────────────────────────────────────────
+        self._log(f"Phase 10/10: Complete! ({elapsed:.1f}s)")
+        n_plots = sum(1 for v in plot_paths.values()
+                      if v is not None and (isinstance(v, Path) or isinstance(v, str)))
+        # Count dict values too
+        for v in plot_paths.values():
+            if isinstance(v, dict):
+                n_plots += sum(1 for p in v.values() if p is not None)
+        self._log(f"  Charts: {n_plots}")
+        self._log(f"  Report: {results.report_path}")
 
-    # ── Data loader ────────────────────────────────────────────────────────
+        return results
 
-    def _load(self, source):
-        """
-        Load raw signals from folder path or dict.
+    # ── Plot generation ────────────────────────────────────────────────────
 
-        In the new pipeline (M3 split -> M4 EDA), this receives raw
-        signal CSVs directly — no feature CSVs expected at this stage.
+    def _generate_all_plots(
+        self,
+        vis: EDAVisualiser,
+        combined: CombinedData,
+        results: AnalysisResults,
+    ) -> Dict[str, Any]:
+        """Generate all 25 visualisations."""
+        paths: Dict[str, Any] = {}
+        q = results.quality
+        s = results.statistics
+        c = results.correlations
+        t = results.temporal
 
-        Returns (signals_dict, features_dict, combined_df)
-        """
-        if isinstance(source, dict):
-            signals = source.get("signals", {})
-            features = source.get("features_raw", {})
-            combined = source.get("combined", pd.DataFrame())
-            return signals, features, combined
+        # V1-V4: Data Understanding & Quality
+        paths["V01_target_distribution"] = vis.plot_target_distribution(
+            q.get("target_distribution"))
+        paths["V02_user_label_heatmap"] = vis.plot_user_label_heatmap(
+            q.get("user_label_matrix"))
+        paths["V03_missing_heatmap"] = vis.plot_missing_heatmap(
+            q.get("missing_values"))
+        paths["V04_outlier_boxplots"] = vis.plot_outlier_boxplots(combined.signals)
 
-        # Folder path — load raw signal CSVs
-        folder = Path(source)
-        signals, features = {}, {}
-        combined = pd.DataFrame()
+        # V5: Distribution
+        paths["V05_histograms_kde"] = vis.plot_histograms_kde(combined.signals)
 
-        # Try multiple locations for signal CSVs
-        cleaned_dir = folder / "cleaned_signals"
-        for sig_name, fname in [("EDA", "EDA.csv"), ("BVP", "BVP.csv"),
-                                ("IBI", "IBI.csv"), ("ST", "ST.csv"), ("ACC", "ACC.csv")]:
-            for candidate in (folder / fname,
-                              cleaned_dir / fname,
-                              folder.parent / fname):
-                if candidate.exists():
-                    df = pd.read_csv(candidate)
-                    if len(df) > 0:
-                        signals[sig_name] = df
-                        self._log(f"  Loaded {sig_name}: {len(df):,} rows "
-                                  f"from {candidate.name}")
-                    break
+        # V6-V7: Violin + Box by target
+        violin_paths = vis.plot_violin_by_target(combined.signals)
+        box_paths = vis.plot_box_by_target(combined.signals)
+        for sig, p in violin_paths.items():
+            paths[f"V06_violin_{sig}"] = p
+        for sig, p in box_paths.items():
+            paths[f"V07_boxplot_{sig}"] = p
 
-        # Load feature CSVs if available (from M5/M6 output)
-        raw_dir = folder / "features_raw"
-        if raw_dir.exists():
-            for sig_name, fname in [("EDA", "EDA_features.csv"),
-                                    ("BVP", "BVP_features.csv"),
-                                    ("IBI", "IBI_features.csv"),
-                                    ("ST", "ST_features.csv"),
-                                    ("ACC", "ACC_features.csv")]:
-                fpath = raw_dir / fname
-                if fpath.exists():
-                    df = pd.read_csv(fpath)
-                    features[sig_name] = df
-                    self._log(f"  Features {sig_name}: {df.shape}")
+        # V8: Category bar
+        paths["V08_category_bar"] = vis.plot_category_bar(
+            s.get("descriptive_by_category"))
 
-            combined_path = raw_dir / "combined_features.csv"
-            if combined_path.exists():
-                combined = pd.read_csv(combined_path)
-                self._log(f"  Combined features: {combined.shape}")
+        # V9: Demographic box plots
+        paths["V09_demographic_autism_severity"] = vis.plot_demographic_boxplots(
+            combined.signals, combined.demographics, "autism_severity")
 
-        # Load combined_signals.csv as fallback
-        combo_path = folder / "combined_signals.csv"
-        if not combo_path.exists():
-            combo_path = cleaned_dir / "combined_signals.csv"
-        if combo_path.exists() and combined.empty:
-            combined = pd.read_csv(combo_path)
-            self._log(f"  Combined signals: {combined.shape}")
+        # V10-V12: Bivariate
+        paths["V10_correlation_heatmap"] = vis.plot_correlation_heatmap(
+            c.get("spearman_matrix"))
+        paths["V11_kw_significance"] = vis.plot_kw_significance(
+            s.get("kruskal_wallis"))
+        paths["V12_effect_size"] = vis.plot_effect_size_heatmap(
+            s.get("kruskal_wallis"))
 
-        return signals, features, combined
+        # V13-V14: Correlational
+        paths["V13_scatter_matrix"] = vis.plot_scatter_matrix(combined.signals)
+        paths["V14_point_biserial_heatmap"] = vis.plot_point_biserial_heatmap(
+            c.get("point_biserial_matrix"))
 
-    def _log(self, msg):
-        if self.verbose:
-            print(msg)
+        # V15-V22: Temporal
+        paths["V15_event_duration"] = vis.plot_event_duration(
+            t.get("event_durations"))
+        paths["V16_pct_change"] = vis.plot_pct_change(
+            t.get("pct_change_summary"))
+        paths["V17_time_to_peak"] = vis.plot_time_to_peak(
+            t.get("time_to_peak_summary"))
+        paths["V18_return_rate"] = vis.plot_return_rate(
+            t.get("return_summary"))
+        paths["V19_return_time_heatmap"] = vis.plot_return_time_heatmap(
+            t.get("return_time_summary"))
+        paths["V20_return_counts"] = vis.plot_return_counts(
+            t.get("return_counts"))
+        paths["V21_median_drift"] = vis.plot_median_drift(
+            t.get("median_drift_summary"))
+        threshold_paths = vis.plot_threshold_traces(
+            combined.signals, t.get("threshold_events"))
+        for sig, p in threshold_paths.items():
+            paths[f"V22_threshold_{sig}"] = p
 
+        # V23-V25: 3D
+        paths["V23_3d_signals"] = vis.plot_3d_signals(combined.signals)
+        paths["V24_pca_3d"] = vis.plot_pca_3d(combined.signals)
+        paths["V25_demographic_3d"] = vis.plot_demographic_3d(
+            combined.signals, combined.demographics)
 
-# Backward compatibility alias
-DataAnalyser = ExploratoryDataAnalyser
+        return paths
+
+    # ── CSV export ─────────────────────────────────────────────────────────
+
+    def _export_csvs(self, results: AnalysisResults, csv_dir: Path):
+        """Export all analysis DataFrames as CSVs."""
+        for name, df in results.quality.items():
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                df.to_csv(csv_dir / f"quality_{name}.csv", index=False)
+
+        for name, df in results.statistics.items():
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                df.to_csv(csv_dir / f"stats_{name}.csv", index=False)
+
+        for name, val in results.correlations.items():
+            if isinstance(val, pd.DataFrame) and not val.empty:
+                val.to_csv(csv_dir / f"corr_{name}.csv",
+                           index=("matrix" in name))
+
+        for name, val in results.temporal.items():
+            if isinstance(val, pd.DataFrame) and not val.empty:
+                val.to_csv(csv_dir / f"temporal_{name}.csv", index=False)
+
+    # ── Auto output directory ──────────────────────────────────────────────
+
+    def _auto_output_dir(self) -> Path:
+        """Find the next auto-numbered output directory."""
+        import re
+        root = Path(OUTPUT_ROOT)
+        root.mkdir(parents=True, exist_ok=True)
+        pattern = re.compile(rf"{MODULE_LABEL}_v{MODULE_VERSION}_run_(\d+)")
+        existing = []
+        if root.exists():
+            for d in root.iterdir():
+                m = pattern.match(d.name)
+                if m:
+                    existing.append(int(m.group(1)))
+        next_num = (max(existing) + 1) if existing else 1
+        return root / f"{MODULE_LABEL}_v{MODULE_VERSION}_run_{next_num:03d}"

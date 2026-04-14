@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import pandas as pd
 
 from config import (
     AUTO_ACCEPT_SANITY_RATE,
@@ -240,6 +241,70 @@ class DataAugmenter:
             elapsed_s=elapsed,
             output_dir=self.output_dir,
         )
+
+    # ═════════════════════════════════════════════════════════════════════
+    # SMOTE feasibility check (advisory — runs before or instead of TGAN)
+    # ═════════════════════════════════════════════════════════════════════
+
+    def check_smote_feasibility(
+        self,
+        feature_csv: Optional[Path] = None,
+        feature_cols: Optional[list] = None,
+        target_col: str = "target_label",
+    ):
+        """
+        Run SMOTE feasibility analysis and report to the researcher.
+
+        Can be called independently before deciding whether to use SMOTE
+        or CT-TimeGAN. Reads a feature CSV (from M6 output) and assesses
+        whether SMOTE is viable for each class.
+
+        Parameters
+        ----------
+        feature_csv : Path to M6 combined features CSV, optional.
+            If None, attempts to find it from source_dir.
+        feature_cols : list of feature column names, optional.
+            If None, auto-detected (excludes meta/demographic cols).
+        target_col : str
+            Name of target label column.
+        """
+        from smote_augmenter import SMOTEAugmenter
+
+        if feature_csv is None:
+            # Try to find M6 output
+            candidates = list(self.source_dir.glob(
+                "**/combined_features*.csv"))
+            if not candidates:
+                log.warning(f"[{MODULE_LABEL}] No feature CSV found for "
+                            f"SMOTE analysis. Provide feature_csv path.")
+                return None
+            feature_csv = candidates[0]
+
+        df = pd.read_csv(feature_csv)
+        if target_col not in df.columns:
+            log.warning(f"[{MODULE_LABEL}] '{target_col}' not found in CSV")
+            return None
+
+        # Auto-detect feature columns
+        if feature_cols is None:
+            meta_cols = {"session_id", "user_id", "window_start_s",
+                         "window_end_s", "split", "target_label",
+                         "age", "gender", "ethnicity", "autism_severity",
+                         "verbal_status", "comorbidity", "gender_enc",
+                         "autism_severity_enc", "verbal_status_enc",
+                         "comorbidity_enc", "ethnicity_enc",
+                         "augmentation_source"}
+            feature_cols = [c for c in df.columns if c not in meta_cols]
+
+        smote = SMOTEAugmenter(seed=self.seed, verbose=True)
+        report = smote.assess_feasibility(
+            X=df[feature_cols].values.astype(np.float64),
+            y=df[target_col].values,
+            class_names=None,  # use raw labels
+        )
+        report.print_report()
+        smote.save_feasibility_report(report, self.output_dir)
+        return report
 
     # ═════════════════════════════════════════════════════════════════════
     # Per-signal TGAN training + generation
