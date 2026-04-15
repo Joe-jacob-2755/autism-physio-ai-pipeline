@@ -30,16 +30,19 @@ autism-physio-ai-pipeline/                    ← repo root
 ├── run_data_acquisition_module.bat / .sh     ← launch Module 2 standalone
 ├── run_data_preprocessing.bat / .sh          ← launch Module 3 standalone
 ├── run_preprocessing_module.bat / .sh        ← Module 3 alternate launcher
+├── run_annotation_module.bat / .sh           ← launch Module 2B standalone
 │
 ├── scripts/
 │   ├── setup.bat                             ← Windows environment setup
 │   └── setup.sh                             ← Mac/Linux environment setup
 │
 ├── tests/
-│   └── test_module_1a.py                     ← Module 2A test suite (35 tests)
+│   ├── test_module_1a.py                     ← Module 2A test suite (35 tests)
+│   └── test_module_2b.py                     ← Module 2B test suite (112 tests)
 │
 ├── module_2a_data_simulation/               ← ✅ BUILT v1.1.0
 ├── module_1_data_acquisition/               ← ✅ BUILT v1.0.0
+├── module_2b_annotation/                    ← ✅ BUILT v1.0.0
 ├── module_3_preprocessing/                  ← ✅ BUILT v1.0.0
 ├── module_4_feature_engineering/            ← 🔜 PLANNED
 ├── module_5_model_training/                 ← 🔜 PLANNED
@@ -380,6 +383,124 @@ module_1_data_acquisition/outputs/M1_v1.0.0_mode2_X_run_NNN/
 - Mode 2.2 imports Module 2A in-process using `_isolated_import()` in pipeline_main.py to avoid config.py collision
 - `FileStreamAdapter` replays any `combined_signals.csv` at configurable speed — use `speed_factor=10.0` for testing without a device
 - E4 Streaming Server must be running locally for Mode 2.3 E4 (default: `127.0.0.1:28000`)
+
+---
+
+## Module 2B — Data Annotation
+**Status:** ✅ Built | **Version:** 1.0.0 | **Files:** 10
+
+### Purpose
+Manual annotation of physiological signal recordings with emotion/behaviour labels. Supports both interactive (matplotlib GUI) and batch (CSV/Excel import) workflows. Designed for the real-world clinical workflow where an observer records events during a session and later transcribes them into a spreadsheet.
+
+### Location
+```
+module_2b_annotation/
+├── config.py               ← ALL constants: 13 emotions (affective + needs +
+│                              behavioural), intensity levels, validation
+│                              thresholds, Excel column aliases, time formats
+├── annotator.py            ← AnnotationEvent dataclass, ManualAnnotator class
+│                              (add/edit/delete/replace, batch import, validation,
+│                              apply annotations to packet, export DataFrames)
+├── validator.py            ← AnnotationValidator: 11 validation rules (R1-R11),
+│                              ValidationResult dataclass with merge()
+├── loader.py               ← SignalLoader: PipelinePacket or folder input,
+│                              annotation stripping for re-annotation,
+│                              _MinimalPacket fallback
+├── exporter.py             ← AnnotationExporter: per-signal CSVs, combined CSV,
+│                              annotations_events.csv, sample_labels at 64 Hz,
+│                              metadata JSON, plots. Auto-numbered output folders.
+├── visualizer.py           ← AnnotationVisualizer: signal overview plots,
+│                              annotated signal plots with event timeline bar
+├── excel_importer.py       ← ExcelImporter: .xlsx/.xls/.csv observer sheets,
+│                              auto-detect columns (23 aliases), clock-to-seconds
+│                              conversion, emotion normalisation, intensity parsing
+├── interactive_annotator.py← Interactive matplotlib GUI: drag-to-annotate,
+│                              right-click edit/delete, undo stack (50 deep),
+│                              keyboard shortcuts (S/Z/Q/C/D)
+├── main.py                 ← run_annotation() pipeline API + run_standalone() CLI
+│                              6 annotation methods: Excel, Visual, CLI, CSV,
+│                              Existing, Skip
+└── __init__.py             ← Public API: ManualAnnotator, run_annotation
+```
+
+### Key Classes / Functions
+
+```python
+# Pipeline-callable API
+from main import run_annotation
+packet = run_annotation(
+    packet=packet,           # PipelinePacket (unannotated)
+    output_dir=output_dir,
+    interactive=True,        # False for batch/automated mode
+    batch_csv=None,          # Path to batch CSV for non-interactive
+)
+
+# Core annotator
+annotator = ManualAnnotator(packet, duration_s=120.0)
+result = annotator.add_event("Fear", start_s=10.0, duration_s=20.0, intensity="High")
+annotator.edit_event(event_id=1, emotion="Anger")
+annotator.delete_event(event_id=1)
+result, removed = annotator.replace_event("Happy", 15.0, 25.0)  # auto-removes overlaps
+n, result = annotator.import_from_csv(path, default_duration_s=15.0)
+packet = annotator.apply_to_packet()  # sets is_annotated=True
+
+# Excel/CSV observer sheet import
+importer = ExcelImporter(recording_start=datetime(...), default_duration_s=15.0)
+result = importer.import_file(Path("observer_log.xlsx"))
+```
+
+### Validation Rules
+
+| Rule | Type | Description |
+|------|------|-------------|
+| R1 | ERROR | Emotion label must be in EMOTIONS_ALL (13 labels) |
+| R2 | ERROR | start_s >= 0 |
+| R3 | ERROR | end_s <= recording duration |
+| R4 | ERROR | end_s > start_s |
+| R5 | ERROR | duration >= 3.0s (MIN_EVENT_DURATION_S) |
+| R6 | ERROR | No overlapping events |
+| R7 | WARNING | Annotation density < 5% of recording |
+| R8 | WARNING | Event duration < 10s (suboptimal for training) |
+| R9 | WARNING | Event within 2s of recording boundary |
+| R10 | WARNING | Only one emotion class present |
+| R11 | ERROR | Batch CSV missing required columns |
+
+### Emotion Labels (13 total)
+
+| Category | Labels |
+|----------|--------|
+| Affective (6) | Happy, Anger, Fear, Disgust, Sad, Surprise |
+| Physiological Needs (4) | Hunger, Thirst, Toilet, Tired |
+| Behavioural (3) | SIB, ATO, GAB |
+
+### Output Structure
+```
+module_2b_annotation/outputs/M2B_v1.0.0_run_NNN/
+  EDA.csv, BVP.csv, IBI.csv, ST.csv, ACC.csv  ← with target_label/event_id/category
+  combined_signals.csv                          ← all channels at 64 Hz, annotated
+  annotations_events.csv                        ← event-level metadata
+  annotations_sample_labels.csv                 ← per-sample labels at 64 Hz
+  signal_overview.png                           ← raw signals (no annotations)
+  signal_annotated.png                          ← signals with event spans + timeline
+  packet_metadata.json                          ← full annotation metadata
+```
+
+### Launch Commands
+```powershell
+.\run_annotation_module                           # Windows interactive
+./run_annotation_module.sh                        # Mac/Linux interactive
+cd module_2b_annotation && python main.py         # direct
+python main.py --source <path> --batch_csv <csv>  # batch mode
+```
+
+### Important Notes
+- Accepts PipelinePacket (from M1/M2A) or folder path for standalone use
+- Re-annotation supported: existing annotation columns are stripped before re-annotating
+- Excel importer auto-detects 23+ column name aliases (case-insensitive)
+- Clock time → seconds conversion requires recording start time from metadata
+- 13 emotions (vs 10 in M2A) — adds SIB, ATO, GAB behavioural targets
+- `interactive=False` in pipeline auto-runner requires `batch_csv` to annotate
+- All annotation columns (`target_label`, `event_id`, `category`) survive through downstream modules
 
 ---
 

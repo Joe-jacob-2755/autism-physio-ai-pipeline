@@ -66,6 +66,7 @@ M5_DIR = REPO_ROOT / "module_5_preprocessing"
 M5B_DIR = REPO_ROOT / "module_5b_data_augmentation"
 M6_DIR = REPO_ROOT / "module_6_feature_engineering"
 M7_DIR = REPO_ROOT / "module_7_model_training"
+M2B_DIR = REPO_ROOT / "module_2b_annotation"
 M8_DIR = REPO_ROOT / "module_8_model_evaluation"
 
 # Names of modules that conflict across pipeline modules
@@ -82,6 +83,7 @@ _CONFLICTING_MODULES = {
     "selection_report",
     "trainer", "evaluator", "class_balancer", "data_loader",
     "models", "report_generator", "xai",
+    "loader", "validator",
 }
 
 WIDTH = 66
@@ -127,6 +129,7 @@ def _detect_modules() -> dict:
     checks = [
         ("M2A", "Data Simulation", M2A_DIR, "simulator.py"),
         ("M1", "Data Acquisition", M1_DIR, "acquisition_module.py"),
+        ("M2B", "Data Annotation (optional)", M2B_DIR, "annotator.py"),
         ("M3", "Data Splitting", M3_DIR, "splitter.py"),
         ("M4", "Exploratory Data Analysis", M4_DIR, "analyser.py"),
         ("M5", "Preprocessing", M5_DIR, "preprocessor.py"),
@@ -196,6 +199,18 @@ def run_m2_simulate(n_users, duration_s, seed, noise):
             save_m1a_output=False,
         )
     return packets
+
+
+def run_m2b_annotation(packet, output_dir, batch_csv=None):
+    """Run Module 2B annotation (optional, for unannotated data)."""
+    with _isolated_import(M2B_DIR):
+        from main import run_annotation
+        return run_annotation(
+            packet=packet,
+            output_dir=output_dir,
+            interactive=False,
+            batch_csv=batch_csv,
+        )
 
 
 def run_m3_split(packets, seed, output_dir=None):
@@ -882,6 +897,41 @@ def run_auto_pipeline(
         manifest.record_user(uid, demographics_by_uid.get(uid))
 
     # ══════════════════════════════════════════════════════════════════════
+    # OPTIONAL: M2B -- Data Annotation (only if packets are unannotated)
+    # ══════════════════════════════════════════════════════════════════════
+    if "M2B" in available:
+        unannotated = [
+            (uid, pkt) for uid, pkt in packets_by_uid.items()
+            if not getattr(pkt, "is_annotated", True)
+        ]
+        if unannotated:
+            step += 1
+            _step(step, total_steps,
+                  "Data Annotation  (M2B) -- OPTIONAL, unannotated data")
+            m2b_out = module_subdir(run_folder, "module_2b_annotation")
+            n_annotated = 0
+            for uid, pkt in unannotated:
+                try:
+                    annotated_pkt = run_m2b_annotation(
+                        pkt, user_subdir(m2b_out, uid))
+                    if getattr(annotated_pkt, "is_annotated", False):
+                        packets_by_uid[uid] = annotated_pkt
+                        n_annotated += 1
+                except Exception as e:
+                    print(f"  [WARN] M2B annotation failed for {uid}: {e}")
+            if n_annotated:
+                manifest.record_module("M2B", m2b_out, {
+                    "n_annotated": n_annotated})
+                _ok(f"Module 2B complete -- {n_annotated} packet(s) annotated")
+            else:
+                _skip("M2B: No packets annotated (batch CSV required "
+                      "for non-interactive mode)")
+            # Rebuild packets list from updated dict
+            packets = list(packets_by_uid.values())
+        else:
+            _skip("M2B: All packets already annotated")
+
+    # ══════════════════════════════════════════════════════════════════════
     # STEP 2: M3 -- Data Splitting (BEFORE preprocessing)
     # ══════════════════════════════════════════════════════════════════════
     if "M3" in available:
@@ -956,7 +1006,7 @@ def run_auto_pipeline(
             traceback.print_exc()
 
     # ── Early stop check ────────────────────────────────────────────────
-    _STOP_ORDER = ["M1", "M3", "M4", "M5", "M5B", "M6", "M7", "M8"]
+    _STOP_ORDER = ["M1", "M2B", "M3", "M4", "M5", "M5B", "M6", "M7", "M8"]
     if stop_after and stop_after in _STOP_ORDER:
         stop_idx = _STOP_ORDER.index(stop_after)
         if stop_idx <= 2:  # M1, M3, or M4
