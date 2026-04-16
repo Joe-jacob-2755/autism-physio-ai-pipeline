@@ -662,10 +662,14 @@ class SelectionReportGenerator:
                 sig, desc, rationale = fm
                 rank_val = int(row_data["rank"])
                 rank = str(rank_val)
-                mi = f'{row_data["score_mutual_information"]:.3f}'
-                rf = f'{row_data["score_random_forest"]:.3f}'
-                fstat = f'{row_data["score_f_statistic"]:.1f}'
-                var = f'{row_data["score_variance"]:.2f}'
+                mi_v = row_data.get("score_mutual_information")
+                rf_v = row_data.get("score_random_forest")
+                fstat_v = row_data.get("score_f_statistic")
+                var_v = row_data.get("score_variance")
+                mi = f'{mi_v:.3f}' if mi_v is not None else "—"
+                rf = f'{rf_v:.3f}' if rf_v is not None else "—"
+                fstat = f'{fstat_v:.1f}' if fstat_v is not None else "—"
+                var = f'{var_v:.2f}' if var_v is not None else "—"
 
                 if col in selected:
                     status = "SELECTED"
@@ -733,13 +737,15 @@ class SelectionReportGenerator:
                          f'border-radius:10px;font-size:11px;'
                          f'font-weight:600">{sig}</span>')
 
-            # Highlight the strongest score
-            scores = {
-                "MI": row_data["score_mutual_information"],
-                "RF": row_data["score_random_forest"],
-                "F":  row_data["score_f_statistic"],
-                "V":  row_data["score_variance"],
-            }
+            # Extract scores (may be absent for non-ensemble methods)
+            mi_v = row_data.get("score_mutual_information")
+            rf_v = row_data.get("score_random_forest")
+            fstat_v = row_data.get("score_f_statistic")
+            var_v = row_data.get("score_variance")
+            mi = f'{mi_v:.3f}' if mi_v is not None else "—"
+            rf = f'{rf_v:.3f}' if rf_v is not None else "—"
+            fstat = f'{fstat_v:.1f}' if fstat_v is not None else "—"
+            var = f'{var_v:.2f}' if var_v is not None else "—"
 
             rows.append(
                 f'<tr>'
@@ -748,14 +754,10 @@ class SelectionReportGenerator:
                 f'<td><code style="font-weight:700">{name}</code></td>'
                 f'<td>{sig_badge}</td>'
                 f'<td style="font-size:12px">{desc}</td>'
-                f'<td style="text-align:right">'
-                f'{row_data["score_mutual_information"]:.3f}</td>'
-                f'<td style="text-align:right">'
-                f'{row_data["score_random_forest"]:.3f}</td>'
-                f'<td style="text-align:right">'
-                f'{row_data["score_f_statistic"]:.1f}</td>'
-                f'<td style="text-align:right">'
-                f'{row_data["score_variance"]:.2f}</td>'
+                f'<td style="text-align:right">{mi}</td>'
+                f'<td style="text-align:right">{rf}</td>'
+                f'<td style="text-align:right">{fstat}</td>'
+                f'<td style="text-align:right">{var}</td>'
                 f'<td style="font-size:12px;color:#555">{rationale}</td>'
                 f'</tr>'
             )
